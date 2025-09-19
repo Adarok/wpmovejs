@@ -3,12 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ## [0.2.0] - 2025-09-20
-- Package scoped to `@adarok/wpmovejs`.
-- Add GitHub Actions CI (Node 18/20) with build + typecheck.
-- Add Release workflow: publish to npm on GitHub Release with provenance, tag/version guard, and scope enforcement.
-- WP-CLI passthrough: ensured positional options pass and `--path` injection works remotely.
-- Rsync filters: verified excludes/includes for push and pull both directions.
-- Init template and README expanded; docs on environment selection `-e` and dry-run semantics.
+## [0.2.1] - 2025-09-20
+- Release automation triggers on semver tag push (`v*.*.*`).
+- CI fix: add `@types/node` to satisfy `types: ["node"]` in tsconfig.
+- README: installation now references scoped package `@adarok/wpmovejs`.
+
 
 ## [0.1.0] - 2025-09-20
 - Initial release.
