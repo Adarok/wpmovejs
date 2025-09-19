@@ -1,0 +1,39 @@
+import { Command } from 'commander';
+import { loadConfig, getEnv } from '../config.js';
+import { run, shQuote } from '../utils/shell.js';
+
+export default function sshCmd(): Command {
+  const cmd = new Command('ssh')
+    .description('Open an interactive SSH session to the remote environment')
+    .argument('<remote>', 'remote environment name to connect to')
+    .argument('[cmd...]', 'optional command to run on the remote host')
+    .option('--no-cd', 'do not cd into configured remote path before starting the shell/command')
+    .action(async (remoteName: string, cmdParts: string[] = [], opts: { cd?: boolean }) => {
+      const cfg = await loadConfig();
+      const remote = getEnv(cfg, remoteName);
+      if (!remote.ssh) throw new Error(`Environment '${remoteName}' has no ssh config`);
+
+      const userAtHost = `${remote.ssh.user}@${remote.ssh.host}`;
+      const port = remote.ssh.port ?? 22;
+      const hasCmd = Array.isArray(cmdParts) && cmdParts.length > 0;
+      const shouldCd = opts.cd !== false && Boolean(remote.ssh.path);
+      const cdPrefix = shouldCd ? `cd ${shQuote(remote.ssh.path!)} && ` : '';
+
+      if (!hasCmd) {
+        if (shouldCd) {
+          // Allocate a PTY and start a login shell after cd into the configured path
+          const remoteCmd = `${cdPrefix}exec $SHELL -l`;
+          await run('ssh', ['-t', '-p', String(port), userAtHost, remoteCmd]);
+        } else {
+          // Plain interactive session
+          await run('ssh', ['-p', String(port), userAtHost]);
+        }
+        return;
+      }
+
+      const remoteCmd = cdPrefix + cmdParts.join(' ');
+      await run('ssh', ['-t', '-p', String(port), userAtHost, remoteCmd]);
+    });
+
+  return cmd;
+}

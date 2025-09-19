@@ -11,6 +11,7 @@ export function buildProgram(): Command {
     .description('Move/sync WordPress between environments (JS reimplementation of wordmove)')
     .version(version)
     .showHelpAfterError()
+    .enablePositionalOptions()
     .option('-v, --verbose', 'enable verbose logging', false)
     .hook('preAction', (thisCmd) => {
       const opts = thisCmd.opts<{ verbose?: boolean }>();
