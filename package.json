@@ -1,6 +1,6 @@
 {
   "name": "@adarok/wpmovejs",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "TypeScript CLI to move/sync WordPress between environments (JS reimplementation of wordmove)",
   "license": "MIT",
   "type": "module",
@@ -19,9 +19,9 @@
     "node": ">=18"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
     "execa": "^8.0.1",
     "fs-extra": "^11.2.0",
     "ora": "^8.0.1",
@@ -64,7 +64,9 @@
     "entry": [
       "src/cli.ts"
     ],
-    "format": ["esm"],
+    "format": [
+      "esm"
+    ],
     "sourcemap": true,
     "clean": true,
     "outDir": "dist",

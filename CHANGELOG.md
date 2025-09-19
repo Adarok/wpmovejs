@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file.
 - CI fix: add `@types/node` to satisfy `types: ["node"]` in tsconfig.
 - README: installation now references scoped package `@adarok/wpmovejs`.
 
+## [0.2.2] - 2025-09-20
+- CLI: show help when no args provided; execute reliably via npm global bin.
+
 
 ## [0.1.0] - 2025-09-20
 - Initial release.

@@ -1,4 +1,6 @@
 import { Command } from 'commander';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { version } from '../package.json';
 import { registerCommands } from './commands/index.js';
 import 'dotenv/config';
@@ -25,13 +27,25 @@ export function buildProgram(): Command {
 
 async function main() {
   const program = buildProgram();
+  if (process.argv.length <= 2) {
+    program.outputHelp();
+    return;
+  }
   await program.parseAsync(process.argv);
 }
 
-// Only run if executed directly, not when imported in tests
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}
+// Only run if executed directly (robust to npm symlinked bin)
+const isMain = (() => {
+  try {
+    const invoked = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';
+    const thisFile = fs.realpathSync(fileURLToPath(import.meta.url));
+    return Boolean(invoked) && invoked === thisFile;
+  } catch {
+    return false;
+  }
+})();
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
