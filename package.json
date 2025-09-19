@@ -1,5 +1,5 @@
 {
-  "name": "wpmovejs",
+  "name": "@adarok/wpmovejs",
   "version": "0.1.0",
   "description": "TypeScript CLI to move/sync WordPress between environments (JS reimplementation of wordmove)",
   "license": "MIT",
@@ -12,7 +12,8 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "start": "node dist/cli.js --help"
+    "start": "node dist/cli.js --help",
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "node": ">=18"
@@ -31,6 +32,32 @@
   "devDependencies": {
     "tsup": "^8.2.4",
     "typescript": "^5.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Adarok/wpmovejs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Adarok/wpmovejs/issues"
+  },
+  "homepage": "https://github.com/Adarok/wpmovejs#readme",
+  "keywords": [
+    "wordpress",
+    "wp-cli",
+    "deploy",
+    "sync",
+    "rsync",
+    "ssh",
+    "wordmove"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "tsup": {
     "entry": [
