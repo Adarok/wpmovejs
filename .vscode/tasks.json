@@ -1,0 +1,24 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install deps and build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"--silent",
+				"clean",
+				"&&",
+				"npm",
+				"install",
+				"--silent",
+				"&&",
+				"npm",
+				"run",
+				"--silent",
+				"build"
+			]
+		}
+	]
+}
