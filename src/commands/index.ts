@@ -10,13 +10,13 @@ import db from './db';
 import wp from './wp';
 
 export function registerCommands(program: Command) {
-  program.addCommand(init());
-  program.addCommand(doctor());
-  program.addCommand(list());
-  program.addCommand(push());
-  program.addCommand(pull());
-  program.addCommand(ssh());
-  program.addCommand(shell());
-  program.addCommand(db());
-  program.addCommand(wp());
+  program.addCommand(init().showHelpAfterError());
+  program.addCommand(doctor().showHelpAfterError());
+  program.addCommand(list().showHelpAfterError());
+  program.addCommand(push().showHelpAfterError());
+  program.addCommand(pull().showHelpAfterError());
+  program.addCommand(ssh().showHelpAfterError());
+  program.addCommand(shell().showHelpAfterError());
+  program.addCommand(db().showHelpAfterError());
+  program.addCommand(wp().showHelpAfterError());
 }

@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
+import type { HooksConfig } from './hooks.js';
 
 const DbSchema = z.object({
   host: z.string(),
@@ -78,7 +79,7 @@ export interface Env {
   db?: Db;
   urls?: string[];
   exclude?: string[];
-  hooks?: any;
+  hooks?: HooksConfig;
   sync?: { excludes?: string[]; includes?: string[]; delete?: boolean };
   paths?: {
     wp_content?: string;

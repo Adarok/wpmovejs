@@ -8,6 +8,9 @@ import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { wp } from '../services/wpcli.js';
 import { runHook } from '../hooks.js';
 import { computeUrlPairs } from '../utils/urls.js';
+import { buildRsyncOpts } from '../utils/syncOptions.js';
+import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
+import { resolveTargets } from '../utils/targets.js';
 
 export default function pull(): Command {
   const cmd = new Command('pull')
@@ -23,34 +26,15 @@ export default function pull(): Command {
   .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
   .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
     .option('--dry-run', 'show what would be done', false)
-    .action(async (maybeEnv, opts) => {
-      const remoteName = opts.environment ?? opts.env ?? (typeof maybeEnv === 'string' ? maybeEnv : undefined);
+    .action(async (opts) => {
+      const remoteName = opts.environment;
       if (!remoteName) throw new Error('Missing --environment/-e. Example: wpmovejs pull -e staging --only db,uploads');
       const cfg = await loadConfig();
       const local = getEnv(cfg, 'local');
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
 
-      let targets: string[] = [];
-      if (opts.only) {
-        targets = String(opts.only).split(',').map((s: string) => s.trim());
-      } else {
-        const map: Record<string, boolean> = {
-          wordpress: Boolean(opts.wordpress),
-          uploads: Boolean(opts.uploads),
-          themes: Boolean(opts.themes),
-          plugins: Boolean(opts.plugins),
-          'mu-plugins': Boolean(opts.muPlugins ?? opts['mu-plugins']),
-          languages: Boolean(opts.languages),
-          db: Boolean(opts.db),
-        };
-        if (opts.all) {
-          targets = Object.keys(map);
-        } else {
-          targets = Object.entries(map).filter(([, v]) => v).map(([k]) => k);
-        }
-      }
-      if (!targets.length) targets = ['db', 'uploads'];
+      const targets = resolveTargets(opts as any);
 
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
       if (!isDry) {
@@ -89,15 +73,11 @@ export default function pull(): Command {
   const themesRel = paths.themes;
   const languagesRel = paths.languages;
 
-  const combinedEnvExcludes = [
-    ...((local.exclude ?? []) as string[]),
-    ...((remote.exclude ?? []) as string[]),
-  ];
-  const syncOpts = { ssh: remote.ssh, dryRun: opts.dryRun, excludes: [...(local.sync?.excludes ?? []), ...combinedEnvExcludes], includes: local.sync?.includes, delete: local.sync?.delete };
+  const syncOpts = buildRsyncOpts(remote, local, { ssh: remote.ssh, dryRun: opts.dryRun });
       const srcRoot = `${remotePath}/`;
       const dstRoot = localWp.endsWith('/') ? localWp : localWp + '/';
       if (targets.includes('wordpress')) {
-        const excludes = ['/' + resolvePaths(remote).wp_content.replace(/^\/?/, '') + '/*', '/wp-config.php', ...(syncOpts.excludes ?? [])];
+        const excludes = ['/' + resolvePaths(remote).wp_content.replace(/^\/?/, '') + '/*', ...DEFAULT_WORDPRESS_EXCLUDES, ...(syncOpts.excludes ?? [])];
         await rsync(srcRoot, dstRoot, { ...syncOpts, excludes });
       }
       if (targets.includes('uploads')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes) });
