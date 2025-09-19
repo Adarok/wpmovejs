@@ -1,21 +1,4 @@
-import { Command } from 'commander';
-import fs from 'fs-extra';
-import path from 'node:path';
-
-export default function init(): Command {
-  const cmd = new Command('init')
-    .description('Create a comprehensive wpmove.yml in the current directory')
-    .option('-f, --force', 'overwrite existing file if present')
-    .action(async (opts) => {
-      const file = path.resolve(process.cwd(), 'wpmove.yml');
-      const exists = await fs.pathExists(file);
-      if (exists && !opts.force) {
-        console.error(`File already exists: ${file}. Use --force to overwrite.`);
-        process.exitCode = 1;
-        return;
-      }
-
-      const template = `# wpmove.yml
+# wpmove.yml
 # Environments configuration for WordPress migrations
 # This template includes all supported options with sensible defaults.
 
@@ -128,11 +111,3 @@ production:
       after:
         local: []
         remote: []
-`;
-
-      await fs.writeFile(file, template, 'utf8');
-      console.log(`Created ${file}`);
-    });
-
-  return cmd;
-}

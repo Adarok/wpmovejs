@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import { version } from '../package.json';
 import { registerCommands } from './commands/index.js';
+import 'dotenv/config';
+import { state } from './state.js';
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -8,7 +10,12 @@ export function buildProgram(): Command {
     .name('wpmovejs')
     .description('Move/sync WordPress between environments (JS reimplementation of wordmove)')
     .version(version)
-    .showHelpAfterError();
+    .showHelpAfterError()
+    .option('-v, --verbose', 'enable verbose logging', false)
+    .hook('preAction', (thisCmd) => {
+      const opts = thisCmd.opts<{ verbose?: boolean }>();
+      state.verbose = Boolean(opts.verbose);
+    });
 
   registerCommands(program);
 

@@ -1,4 +1,4 @@
-import { run, ssh } from '../utils/shell.js';
+import { run, ssh, shQuote } from '../utils/shell.js';
 
 export interface WPOptions {
   bin?: string;
@@ -8,10 +8,11 @@ export interface WPOptions {
 
 export async function wp(args: string[], options: WPOptions = {}) {
   const bin = options.bin ?? 'wp';
+  const pathFlag = options.remote ? `--path=${options.remote.path}` : options.cwd ? `--path=${options.cwd}` : null;
+  const fullArgs = pathFlag ? [pathFlag, ...args] : [...args];
   if (options.remote) {
-    const cmd = `${bin} ${args.join(' ')}`;
-    const cd = options.remote.path ? `cd ${options.remote.path} && ` : '';
-    return ssh(options.remote.user, options.remote.host, `${cd}${cmd}`, options.remote.port);
+    const cmd = `${shQuote(bin)} ${fullArgs.map((a) => shQuote(a)).join(' ')}`;
+    return ssh(options.remote.user, options.remote.host, cmd, options.remote.port);
   }
-  return run(bin, args, { cwd: options.cwd });
+  return run(bin, fullArgs, { cwd: options.cwd });
 }

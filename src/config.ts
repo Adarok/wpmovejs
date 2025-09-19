@@ -24,6 +24,34 @@ const EnvSchema = z.object({
   ssh: SshSchema.optional(),
   db: DbSchema.optional(),
   urls: z.array(z.string()).optional(),
+  exclude: z.array(z.string()).optional(),
+  hooks: z
+    .object({
+      push: z.object({ before: z.object({ local: z.array(z.string()).optional(), remote: z.array(z.string()).optional() }).partial().optional(), after: z.object({ local: z.array(z.string()).optional(), remote: z.array(z.string()).optional() }).partial().optional() }).partial().optional(),
+      pull: z.object({ before: z.object({ local: z.array(z.string()).optional(), remote: z.array(z.string()).optional() }).partial().optional(), after: z.object({ local: z.array(z.string()).optional(), remote: z.array(z.string()).optional() }).partial().optional() }).partial().optional(),
+    })
+    .partial()
+    .optional(),
+  sync: z
+    .object({
+      excludes: z.array(z.string()).optional(),
+      includes: z.array(z.string()).optional(),
+      delete: z.boolean().optional(),
+    })
+    .partial()
+    .optional(),
+  paths: z
+    .object({
+      wp_content: z.string().optional(),
+      wp_config: z.string().optional(),
+      plugins: z.string().optional(),
+      mu_plugins: z.string().optional(),
+      themes: z.string().optional(),
+      uploads: z.string().optional(),
+      languages: z.string().optional(),
+    })
+    .partial()
+    .optional(),
 });
 
 const ConfigSchema = z.record(EnvSchema);
@@ -49,6 +77,32 @@ export interface Env {
   ssh?: Ssh;
   db?: Db;
   urls?: string[];
+  exclude?: string[];
+  hooks?: any;
+  sync?: { excludes?: string[]; includes?: string[]; delete?: boolean };
+  paths?: {
+    wp_content?: string;
+    wp_config?: string;
+    plugins?: string;
+    mu_plugins?: string;
+    themes?: string;
+    uploads?: string;
+    languages?: string;
+  };
+}
+
+export function resolvePaths(env: Env) {
+  const p = env.paths ?? {};
+  const wp_content = p.wp_content ?? 'wp-content';
+  return {
+    wp_content,
+    wp_config: p.wp_config ?? 'wp-config.php',
+    plugins: p.plugins ?? `${wp_content}/plugins`,
+    mu_plugins: p.mu_plugins ?? `${wp_content}/mu-plugins`,
+    themes: p.themes ?? `${wp_content}/themes`,
+    uploads: p.uploads ?? `${wp_content}/uploads`,
+    languages: p.languages ?? `${wp_content}/languages`,
+  } as const;
 }
 
 export type MoveConfig = Record<string, Env>;

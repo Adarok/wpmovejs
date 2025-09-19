@@ -1,52 +1,132 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
-import { getEnv, loadConfig } from '../config.js';
+import { getEnv, loadConfig, resolvePaths } from '../config.js';
 import fs from 'fs-extra';
-import { rsync } from '../utils/shell.js';
+import { runHook } from '../hooks.js';
+import { computeUrlPairs } from '../utils/urls.js';
+import { rsync, ssh, shQuote } from '../utils/shell.js';
+import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
+
+function ensureSlash(p: string) {
+  if (!p.startsWith('/')) p = '/' + p;
+  if (!p.endsWith('/')) p = p + '/';
+  return p;
+}
 import { wp } from '../services/wpcli.js';
 
 export default function push(): Command {
   const cmd = new Command('push')
-    .description('Push database and/or files from local to remote environment')
-    .argument('<remote>', 'remote environment name to push to')
-    .option('--only <targets>', 'comma-separated: db,uploads,plugins,themes', 'db,uploads')
+  .description('Push database and/or files from local to remote environment')
+  .argument('<remote>', 'remote environment name to push to')
+  .option('-w, --wordpress', 'include WordPress core (excluding wp-content)')
+  .option('-u, --uploads', 'include uploads')
+  .option('-t, --themes', 'include themes')
+  .option('-p, --plugins', 'include plugins')
+  .option('-m, --mu-plugins', 'include mu-plugins')
+  .option('-l, --languages', 'include languages')
+  .option('-d, --db', 'include database')
+  .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
+  .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
+    .option('--dry-run', 'show what would be done', false)
     .action(async (remoteName, opts) => {
       const cfg = await loadConfig();
       const local = getEnv(cfg, 'local');
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
 
-      const targets = String(opts.only).split(',').map((s) => s.trim());
+      let targets: string[] = [];
+      if (opts.only) {
+        targets = String(opts.only).split(',').map((s: string) => s.trim());
+      } else {
+        const map: Record<string, boolean> = {
+          wordpress: Boolean(opts.wordpress),
+          uploads: Boolean(opts.uploads),
+          themes: Boolean(opts.themes),
+          plugins: Boolean(opts.plugins),
+          'mu-plugins': Boolean(opts.muPlugins ?? opts['mu-plugins']),
+          languages: Boolean(opts.languages),
+          db: Boolean(opts.db),
+        };
+        if (opts.all) {
+          targets = Object.keys(map);
+        } else {
+          targets = Object.entries(map).filter(([, v]) => v).map(([k]) => k);
+        }
+      }
+      if (!targets.length) targets = ['db', 'uploads'];
+      const isDry = Boolean(opts.dry_run ?? opts.dryRun);
 
-      if (targets.includes('db')) {
-        const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
-        const tmpBase = path.basename(tmpLocal);
-        const remoteDir = remote.ssh.path;
-        const tmpRemote = `${remoteDir}/${tmpBase}`;
-
-        await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-        await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh });
-        await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
-
-        const search = (local.urls && local.urls[0]) ?? 'http://localhost';
-        const replace = (remote.urls && remote.urls[0]) ?? `https://${remote.ssh.host}`;
-        await wp(['db', 'search-replace', search, replace, '--all-tables'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
-
-        try { await fs.promises.unlink(tmpLocal); } catch {}
-        try { await wp(['eval', `unlink('${tmpRemote}')`], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli }); } catch {}
+      if (!isDry) {
+        await runHook(local.hooks?.push?.before);
+        await runHook(remote.hooks?.push?.before, { ...remote.ssh, path: remote.ssh.path });
       }
 
-      const localWp = local.wordpress_path ?? '.';
+      if (targets.includes('db')) {
+        if (isDry) {
+          console.log('[dry-run] Would export DB locally, transfer to remote, import, and run search-replace');
+        } else {
+          const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
+          const tmpBase = path.basename(tmpLocal);
+          const remoteDir = remote.ssh.path;
+          const tmpRemote = `${remoteDir}/${tmpBase}`;
+
+          await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+          await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+          await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+
+          const pairs = computeUrlPairs(local, remote);
+          for (const p of pairs) {
+            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+          }
+
+          try { await fs.promises.unlink(tmpLocal); } catch {}
+          try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
+        }
+      }
+
+  const localWp = local.wordpress_path ?? '.';
+  const paths = resolvePaths(local);
       const remotePath = `${remote.ssh.user}@${remote.ssh.host}:${remote.ssh.path}`;
-      const uploads = path.join(localWp, 'wp-content/uploads/');
-      const plugins = path.join(localWp, 'wp-content/plugins/');
-      const themes = path.join(localWp, 'wp-content/themes/');
+  const uploadsRel = paths.uploads;
+  const pluginsRel = paths.plugins;
+  const muPluginsRel = paths.mu_plugins;
+  const themesRel = paths.themes;
+  const languagesRel = paths.languages;
 
-      if (targets.includes('uploads')) await rsync(uploads, remotePath + '/wp-content/uploads/', { ssh: remote.ssh });
-      if (targets.includes('plugins')) await rsync(plugins, remotePath + '/wp-content/plugins/', { ssh: remote.ssh });
-      if (targets.includes('themes')) await rsync(themes, remotePath + '/wp-content/themes/', { ssh: remote.ssh });
+  const combinedEnvExcludes = [
+    ...((local.exclude ?? []) as string[]),
+    ...((remote.exclude ?? []) as string[]),
+  ];
+  const syncOpts = { ssh: remote.ssh, dryRun: opts.dryRun, excludes: [...(remote.sync?.excludes ?? []), ...combinedEnvExcludes], includes: remote.sync?.includes, delete: remote.sync?.delete };
+      // Sync from the WP root so filters behave consistently
+      const srcRoot = localWp.endsWith('/') ? localWp : localWp + '/';
+      const dstRoot = remotePath + '/';
+      if (targets.includes('wordpress')) {
+        const wpContentRel = resolvePaths(local).wp_content;
+        const excludes = ['/' + wpContentRel.replace(/^\/?/, '') + '/*', '/wp-config.php', ...(syncOpts.excludes ?? [])];
+        await rsync(srcRoot, dstRoot, { ...syncOpts, excludes });
+      }
+      if (targets.includes('uploads')) {
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes) });
+      }
+      if (targets.includes('plugins')) {
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel), excludes: excludePathsFor(pluginsRel, syncOpts.excludes) });
+      }
+      if (targets.includes('mu-plugins')) {
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(muPluginsRel), excludes: excludePathsFor(muPluginsRel, syncOpts.excludes) });
+      }
+      if (targets.includes('themes')) {
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel), excludes: excludePathsFor(themesRel, syncOpts.excludes) });
+      }
+      if (targets.includes('languages')) {
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes) });
+      }
 
+      if (!isDry) {
+        await runHook(local.hooks?.push?.after);
+        await runHook(remote.hooks?.push?.after, { ...remote.ssh, path: remote.ssh.path });
+      }
       console.log('Push completed');
     });
   return cmd;

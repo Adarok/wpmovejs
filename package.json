@@ -18,6 +18,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "execa": "^8.0.1",
