@@ -12,9 +12,9 @@ TypeScript/Node.js CLI to move/sync WordPress between environments. Inspired by 
 ## Install
 
 - Global:
-  - `npm i -g wpmovejs`
+  - `npm i -g @adarok/wpmovejs`
 - Project-local:
-  - `npm i -D wpmovejs`
+  - `npm i -D @adarok/wpmovejs`
   - `npx wpmovejs --help`
 
 ## Quick Start
