@@ -5,11 +5,12 @@ import { run, shQuote } from '../utils/shell.js';
 export default function shell(): Command {
   const cmd = new Command('shell')
     .description('Open a WP-CLI interactive shell (wp shell) locally or on a remote environment')
-    .argument('<env>', 'environment name (use "local" or a remote name)')
+    .option('-e, --environment <name>', 'environment name (use "local" or a remote name)')
     .option('--local', 'force running locally even if env has ssh')
     .option('--no-cd', 'do not cd into configured path before starting the shell')
-    .action(async (envName: string, opts: { local?: boolean; cd?: boolean }) => {
+    .action(async (opts: { environment?: string; local?: boolean; cd?: boolean }) => {
       const cfg = await loadConfig();
+      const envName = opts.environment ?? 'local';
       const env = getEnv(cfg, envName);
       const shouldCd = opts.cd !== false && Boolean(env.wordpress_path || env.ssh?.path);
 

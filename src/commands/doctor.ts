@@ -5,8 +5,8 @@ import { whichCmd } from '../utils/shell.js';
 export default function doctor(): Command {
   const cmd = new Command('doctor')
     .description('Check prerequisites and configuration')
-    .option('-e, --env <name>', 'environment name to validate', 'local')
-    .action(async (opts) => {
+  .option('-e, --environment <name>', 'environment name to validate', 'local')
+  .action(async (opts: { environment: string }) => {
       const missing: string[] = [];
       const wpPath = await whichCmd('wp');
       if (!wpPath) missing.push('wp (wp-cli)');
@@ -15,8 +15,8 @@ export default function doctor(): Command {
 
       try {
         const config = await loadConfig();
-        if (!config[opts.env]) {
-          missing.push(`environment '${opts.env}' not found in wpmove.yml`);
+        if (!config[opts.environment]) {
+          missing.push(`environment '${opts.environment}' not found in wpmove.yml`);
         }
       } catch (e: any) {
         missing.push(e.message);

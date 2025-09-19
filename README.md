@@ -52,10 +52,10 @@ wpmovejs doctor --env local
 wpmovejs list
 
 # Push db + uploads to remote
-wpmovejs push production --only db,uploads
+wpmovejs push -e production --only db,uploads
 
 # Pull db + uploads from remote
-wpmovejs pull production --only db,uploads
+wpmovejs pull -e production --only db,uploads
 ```
 
 ## Configuration: `wpmove.yml`
@@ -146,12 +146,12 @@ Notes:
 - `init`: Generate a starter `wpmove.yml`.
 - `doctor`: Verify prerequisites and validate config.
 - `list`: Show configured environments and their targets.
-- `push <remote>`: Push db/files from `local` to `<remote>`.
-- `pull <remote>`: Pull db/files from `<remote>` to `local`.
-- `ssh <remote> [cmd...]`: Open an interactive SSH session or run a remote command. By default, it cd's into the configured `ssh.path`. Use `--no-cd` to disable.
-- `shell <env>`: Open a WP-CLI interactive shell (`wp shell`) on `local` or a remote environment. Respects `wordpress_path`/`ssh.path`. Use `--no-cd` to disable, `--local` to force local.
-- `db shell|cli <env> [args...]`: Open the DB CLI via `wp db cli` locally or remotely. Supports `--no-cd` and `--local`.
-- `wp <env> [args...]`: Run any wp-cli command in the context of an environment. All flags are passed through.
+- `push -e <env>`: Push db/files from `local` to `<env>`.
+- `pull -e <env>`: Pull db/files from `<env>` to `local`.
+- `ssh -e <env> [cmd...]`: Open an interactive SSH session or run a remote command. By default, it cd's into `ssh.path`. Use `--no-cd` to disable.
+- `shell -e <env>`: Open a WP-CLI interactive shell (`wp shell`) on `local` or a remote environment. Respects `wordpress_path`/`ssh.path`. Use `--no-cd` to disable, `--local` to force local.
+- `db shell|cli -e <env> [args...]`: Open the DB CLI via `wp db cli` locally or remotely. Supports `--no-cd` and `--local`.
+- `wp -e <env> [args...]`: Run any wp-cli command in the context of an environment. All flags are passed through.
 
 Use `--only db,uploads,plugins,themes` to select subsets. Add `--dry-run` to preview rsync/db steps and `-v/--verbose` to print executed commands.
 
@@ -159,55 +159,55 @@ Use `--only db,uploads,plugins,themes` to select subsets. Add `--dry-run` to pre
 
 ```sh
 # Open an interactive shell on production, cd into ssh.path
-wpmovejs ssh production
+wpmovejs ssh -e production
 
 # Run a command remotely and return
-wpmovejs ssh production wp core version --allow-root
+wpmovejs ssh -e production wp core version --allow-root
 
 # Open a session without cd
-wpmovejs ssh production --no-cd
+wpmovejs ssh -e production --no-cd
 ```
 
 ### WP-CLI shell examples
 
 ```sh
 # Local wp shell inside wordpress_path
-wpmovejs shell local
+wpmovejs shell -e local
 
 # Remote wp shell inside ssh.path
-wpmovejs shell production
+wpmovejs shell -e production
 
 # Force local even if env has ssh configured
-wpmovejs shell local --local
+wpmovejs shell -e local --local
 
 # Without cd into site path
-wpmovejs shell production --no-cd
+wpmovejs shell -e production --no-cd
 ```
 
 ### DB shell examples
 
 ```sh
 # Local MySQL client via wp db cli
-wpmovejs db shell local
+wpmovejs db shell -e local
 
 # Remote MySQL client via wp db cli
-wpmovejs db shell production
+wpmovejs db shell -e production
 
 # Pass extra args to the DB client
-wpmovejs db shell production -- --pager=less -A
+wpmovejs db shell -e production -- --pager=less -A
 ```
 
 ### wp-cli passthrough examples
 
 ```sh
 # Run a core update check remotely
-wpmovejs wp production core check-update
+wpmovejs wp -e production core check-update
 
 # List plugins locally with custom format
-wpmovejs wp local plugin list --format=json
+wpmovejs wp -e local plugin list --format=json
 
 # Run search-replace remotely (path is injected)
-wpmovejs wp staging search-replace https://staging.example.com https://example.com --skip-columns=guid --all-tables
+wpmovejs wp -e staging search-replace https://staging.example.com https://example.com --skip-columns=guid --all-tables
 ```
 
 ## Sync Options & Hooks

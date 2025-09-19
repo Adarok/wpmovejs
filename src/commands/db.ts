@@ -6,12 +6,13 @@ function buildDbShell(): Command {
   const cmd = new Command('shell')
     .aliases(['cli'])
     .description('Open database CLI via wp db cli (local or remote)')
-    .argument('<env>', 'environment name (use "local" or a remote name)')
+    .option('-e, --environment <name>', 'environment name (use "local" or a remote name)')
     .argument('[args...]', 'additional args passed to wp db cli')
     .option('--local', 'force running locally even if env has ssh')
     .option('--no-cd', 'do not cd into configured path before executing')
-    .action(async (envName: string, args: string[] = [], opts: { local?: boolean; cd?: boolean }) => {
+    .action(async (args: string[] = [], opts: { environment?: string; local?: boolean; cd?: boolean }) => {
       const cfg = await loadConfig();
+      const envName = opts.environment ?? 'local';
       const env = getEnv(cfg, envName);
       const shouldCd = opts.cd !== false && Boolean(env.wordpress_path || env.ssh?.path);
       const extra = args.join(' ');

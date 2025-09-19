@@ -12,7 +12,7 @@ import { computeUrlPairs } from '../utils/urls.js';
 export default function pull(): Command {
   const cmd = new Command('pull')
   .description('Pull database and/or files from remote to local environment')
-  .argument('<remote>', 'remote environment name to pull from')
+  .option('-e, --environment <name>', 'remote environment name to pull from')
   .option('-w, --wordpress', 'include WordPress core (excluding wp-content)')
   .option('-u, --uploads', 'include uploads')
   .option('-t, --themes', 'include themes')
@@ -23,7 +23,9 @@ export default function pull(): Command {
   .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
   .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
     .option('--dry-run', 'show what would be done', false)
-    .action(async (remoteName, opts) => {
+    .action(async (maybeEnv, opts) => {
+      const remoteName = opts.environment ?? opts.env ?? (typeof maybeEnv === 'string' ? maybeEnv : undefined);
+      if (!remoteName) throw new Error('Missing --environment/-e. Example: wpmovejs pull -e staging --only db,uploads');
       const cfg = await loadConfig();
       const local = getEnv(cfg, 'local');
       const remote = getEnv(cfg, remoteName);

@@ -5,13 +5,15 @@ import { run, shQuote } from '../utils/shell.js';
 export default function sshCmd(): Command {
   const cmd = new Command('ssh')
     .description('Open an interactive SSH session to the remote environment')
-    .argument('<remote>', 'remote environment name to connect to')
+    .option('-e, --environment <name>', 'remote environment name to connect to')
     .argument('[cmd...]', 'optional command to run on the remote host')
     .option('--no-cd', 'do not cd into configured remote path before starting the shell/command')
-    .action(async (remoteName: string, cmdParts: string[] = [], opts: { cd?: boolean }) => {
+    .action(async (cmdParts: string[] = [], opts: { environment?: string; cd?: boolean }) => {
       const cfg = await loadConfig();
-      const remote = getEnv(cfg, remoteName);
-      if (!remote.ssh) throw new Error(`Environment '${remoteName}' has no ssh config`);
+      const envName = opts.environment;
+      if (!envName) throw new Error('Missing --environment/-e. Example: wpmovejs ssh -e staging');
+      const remote = getEnv(cfg, envName);
+      if (!remote.ssh) throw new Error(`Environment '${envName}' has no ssh config`);
 
       const userAtHost = `${remote.ssh.user}@${remote.ssh.host}`;
       const port = remote.ssh.port ?? 22;
