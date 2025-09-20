@@ -19,6 +19,9 @@ export function includePathsFor(relPath: string): string[] {
     const seg = parts.slice(0, i + 1).join('/');
     acc.push(ensureTrailingSlash(ensureLeadingSlash(seg)));
   }
+  // Ensure all contents under relPath are included
+  const full = ensureLeadingSlash(parts.join('/'));
+  acc.push(`${full}/***`);
   return acc;
 }
 

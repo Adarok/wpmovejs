@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { includePathsFor, excludePathsFor } from '../src/utils/rsyncFilters.js';
 
 describe('rsyncFilters', () => {
-  it('includePathsFor builds leading/trailing slash chain', () => {
+  it('includePathsFor builds leading/trailing chain plus recursive include', () => {
     expect(includePathsFor('wp-content/uploads')).toEqual([
       '/wp-content/',
       '/wp-content/uploads/',
+      '/wp-content/uploads/***',
     ]);
   });
   it('excludePathsFor excludes parents and root wildcard plus user excludes', () => {

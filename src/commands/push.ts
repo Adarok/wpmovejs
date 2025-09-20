@@ -45,31 +45,6 @@ export default function push(): Command {
         await runHook(remote.hooks?.push?.before, { ...remote.ssh, path: remote.ssh.path });
       }
 
-      if (targets.includes('db')) {
-        if (isDry) {
-          logDry('Would export DB locally, transfer to remote, import, and run search-replace');
-        } else {
-          logInfo('Database push: export local → import remote and search-replace');
-          const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
-          const tmpBase = path.basename(tmpLocal);
-          const remoteDir = remote.ssh.path;
-          const tmpRemote = `${remoteDir}/${tmpBase}`;
-
-          await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-          await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
-          await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
-
-          const pairs = computeUrlPairs(local, remote);
-          for (const p of pairs) {
-            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
-          }
-
-          try { await fs.promises.unlink(tmpLocal); } catch {}
-          try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
-          logOk('Database push completed');
-        }
-      }
-
   const localWp = local.wordpress_path ?? '.';
   const paths = resolvePaths(local);
       const remotePath = `${remote.ssh.user}@${remote.ssh.host}:${remote.ssh.path}`;
@@ -102,6 +77,32 @@ export default function push(): Command {
       }
       if (targets.includes('languages')) {
         await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes) });
+      }
+
+      // Run DB last to ensure files/plugins are present for wp-cli operations
+      if (targets.includes('db')) {
+        if (isDry) {
+          logDry('Would export DB locally, transfer to remote, import, and run search-replace');
+        } else {
+          logInfo('Database push: export local → import remote and search-replace');
+          const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
+          const tmpBase = path.basename(tmpLocal);
+          const remoteDir = remote.ssh.path;
+          const tmpRemote = `${remoteDir}/${tmpBase}`;
+
+          await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+          await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+          await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+
+          const pairs = computeUrlPairs(local, remote);
+          for (const p of pairs) {
+            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+          }
+
+          try { await fs.promises.unlink(tmpLocal); } catch {}
+          try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
+          logOk('Database push completed');
+        }
       }
 
       if (!isDry) {
