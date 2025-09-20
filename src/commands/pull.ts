@@ -12,6 +12,7 @@ import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
 import { resolveTargets } from '../utils/targets.js';
 import { logDry, logInfo, logOk } from '../state.js';
+import { preflight } from '../preflight.js';
 
 export default function pull(): Command {
   const cmd = new Command('pull')
@@ -38,6 +39,9 @@ export default function pull(): Command {
       const targets = resolveTargets(opts as any);
 
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
+      if (!isDry) {
+        await preflight(local, remote, { targets, operation: 'pull' });
+      }
       if (!isDry) {
         await runHook(local.hooks?.pull?.before);
         await runHook(remote.hooks?.pull?.before, { ...remote.ssh, path: remote.ssh.path });

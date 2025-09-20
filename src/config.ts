@@ -16,7 +16,9 @@ const SshSchema = z.object({
   host: z.string(),
   user: z.string(),
   port: z.number().int().positive().default(22).optional(),
-  path: z.string(),
+  path: z.string().refine((p: string) => p.startsWith('/'), {
+    message: 'ssh.path must be an absolute path starting with /',
+  }),
 });
 
 const EnvSchema = z.object({
@@ -24,8 +26,8 @@ const EnvSchema = z.object({
   wp_cli: z.string().default('wp').optional(),
   ssh: SshSchema.optional(),
   db: DbSchema.optional(),
-  urls: z.array(z.string()).optional(),
-  exclude: z.array(z.string()).optional(),
+  urls: z.array(z.string().url('must be a valid URL')).optional(),
+  exclude: z.array(z.string()).transform((a: string[]) => a.map((s: string) => s.trim())).optional(),
   hooks: z
     .object({
       push: z.object({ before: z.object({ local: z.array(z.string()).optional(), remote: z.array(z.string()).optional() }).partial().optional(), after: z.object({ local: z.array(z.string()).optional(), remote: z.array(z.string()).optional() }).partial().optional() }).partial().optional(),
@@ -35,21 +37,42 @@ const EnvSchema = z.object({
     .optional(),
   sync: z
     .object({
-      excludes: z.array(z.string()).optional(),
-      includes: z.array(z.string()).optional(),
+  excludes: z.array(z.string()).transform((a: string[]) => a.map((s: string) => s.trim())).optional(),
+  includes: z.array(z.string()).transform((a: string[]) => a.map((s: string) => s.trim())).optional(),
       delete: z.boolean().optional(),
     })
     .partial()
     .optional(),
   paths: z
     .object({
-      wp_content: z.string().optional(),
-      wp_config: z.string().optional(),
-      plugins: z.string().optional(),
-      mu_plugins: z.string().optional(),
-      themes: z.string().optional(),
-      uploads: z.string().optional(),
-      languages: z.string().optional(),
+      wp_content: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
+      wp_config: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
+      plugins: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
+      mu_plugins: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
+      themes: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
+      uploads: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
+      languages: z
+        .string()
+        .refine((p: string) => !p.startsWith('/') && !p.includes('..'), { message: 'must be relative and not contain ..' })
+        .optional(),
     })
     .partial()
     .optional(),

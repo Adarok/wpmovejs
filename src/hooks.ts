@@ -1,4 +1,4 @@
-import { ssh, run } from './utils/shell.js';
+import { ssh, run, shQuote } from './utils/shell.js';
 import { logVerbose } from './state.js';
 
 export interface HookDef {
@@ -20,8 +20,8 @@ export async function runHook(def: HookDef | undefined, remote?: { user: string;
   if (remote) {
     for (const cmd of def.remote ?? []) {
       logVerbose('hook remote:', cmd);
-      const cd = remote.path ? `cd ${remote.path} && ` : '';
-      await ssh(remote.user, remote.host, `${cd}${cmd}`, remote.port);
+      const cd = remote.path ? `cd ${shQuote(remote.path)} && ` : '';
+      await ssh(remote.user, remote.host, `sh -lc ${shQuote(cd + cmd)}`, remote.port);
     }
   }
 }

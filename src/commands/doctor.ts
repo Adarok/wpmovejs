@@ -1,6 +1,7 @@
 import { Command } from 'commander';
-import { loadConfig } from '../config.js';
+import { getEnv, loadConfig, resolvePaths } from '../config.js';
 import { whichCmd } from '../utils/shell.js';
+import path from 'node:path';
 
 export default function doctor(): Command {
   const cmd = new Command('doctor')
@@ -15,8 +16,23 @@ export default function doctor(): Command {
 
       try {
         const config = await loadConfig();
-        if (!config[opts.environment]) {
-          missing.push(`environment '${opts.environment}' not found in wpmove.yml`);
+        const env = getEnv(config, opts.environment);
+        // Basic path checks
+        const wpPath = env.wordpress_path ?? '.';
+        if (path.isAbsolute(wpPath)) {
+          missing.push(`wordpress_path should be relative to project (got absolute: ${wpPath})`);
+        }
+        const p = resolvePaths(env);
+        const rels = [p.wp_content, p.plugins, p.mu_plugins, p.themes, p.uploads, p.languages, p.wp_config];
+        if (rels.some((r) => r.startsWith('/') || r.includes('..'))) {
+          missing.push('paths.* entries must be relative and must not contain ..');
+        }
+        // URL sanity
+        if (env.urls && env.urls.length === 0) missing.push('urls is empty');
+        if (env.urls && env.urls.some((u) => !/^https?:\/\//i.test(u))) missing.push('urls must start with http:// or https://');
+        // SSH sanity
+        if (env.ssh) {
+          if (!env.ssh.path || !env.ssh.path.startsWith('/')) missing.push('ssh.path must be an absolute path starting with /');
         }
       } catch (e: any) {
         missing.push(e.message);

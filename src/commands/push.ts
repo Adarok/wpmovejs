@@ -12,6 +12,7 @@ import { wp } from '../services/wpcli.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
 import { logDry, logInfo, logOk } from '../state.js';
+import { preflight } from '../preflight.js';
 
 export default function push(): Command {
   const cmd = new Command('push')
@@ -39,6 +40,10 @@ export default function push(): Command {
 
       const targets = resolveTargets(opts as any);
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
+
+      if (!isDry) {
+        await preflight(local, remote, { targets, operation: 'push' });
+      }
 
       if (!isDry) {
         await runHook(local.hooks?.push?.before);
