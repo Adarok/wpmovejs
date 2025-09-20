@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-09-20
+- Colorized CLI output with clear `[local]` and `[remote]` labels.
+- rsync now streams per-file changes live; dry-run lists files using `--itemize-changes` and recursive include patterns.
+- Execute database sync last in both push and pull to ensure wp-cli has required files/plugins.
+- Filters: include chain updated to add recursive include (`/***`) so dry-run shows files inside target directories.
+
 ## [0.2.3] - 2025-09-20
 - Add ESLint (flat config) with CI lint step; fix initial warnings.
 - Dependabot: group npm updates to reduce PR noise.

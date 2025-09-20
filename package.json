@@ -1,6 +1,6 @@
 {
   "name": "@adarok/wpmovejs",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "TypeScript CLI to move/sync WordPress between environments (JS reimplementation of wordmove)",
   "license": "MIT",
   "type": "module",
