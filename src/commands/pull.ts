@@ -11,6 +11,7 @@ import { computeUrlPairs } from '../utils/urls.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
 import { resolveTargets } from '../utils/targets.js';
+import { logDry, logInfo, logOk } from '../state.js';
 
 export default function pull(): Command {
   const cmd = new Command('pull')
@@ -44,8 +45,9 @@ export default function pull(): Command {
 
       if (targets.includes('db')) {
         if (isDry) {
-          console.log('[dry-run] Would export DB on remote, transfer, import locally, and run search-replace');
+          logDry('Would export DB on remote, transfer, import locally, and run search-replace');
         } else {
+        logInfo('Database pull: export remote → import local and search-replace');
         const remoteDir = remote.ssh.path;
         const tmpRemote = `${remoteDir}/wpmovejs-${Date.now()}.sql`;
         const tmpLocal = path.join(os.tmpdir(), path.basename(tmpRemote));
@@ -61,6 +63,7 @@ export default function pull(): Command {
 
   try { await fs.promises.unlink(tmpLocal); } catch {}
   try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
+    logOk('Database pull completed');
         }
       }
 
@@ -90,7 +93,7 @@ export default function pull(): Command {
         await runHook(local.hooks?.pull?.after);
         await runHook(remote.hooks?.pull?.after, { ...remote.ssh, path: remote.ssh.path });
       }
-      console.log('Pull completed');
+  logOk('Pull completed');
     });
   return cmd;
 }

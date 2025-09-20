@@ -11,6 +11,7 @@ import { resolveTargets } from '../utils/targets.js';
 import { wp } from '../services/wpcli.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
+import { logDry, logInfo, logOk } from '../state.js';
 
 export default function push(): Command {
   const cmd = new Command('push')
@@ -46,8 +47,9 @@ export default function push(): Command {
 
       if (targets.includes('db')) {
         if (isDry) {
-          console.log('[dry-run] Would export DB locally, transfer to remote, import, and run search-replace');
+          logDry('Would export DB locally, transfer to remote, import, and run search-replace');
         } else {
+          logInfo('Database push: export local → import remote and search-replace');
           const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
           const tmpBase = path.basename(tmpLocal);
           const remoteDir = remote.ssh.path;
@@ -64,6 +66,7 @@ export default function push(): Command {
 
           try { await fs.promises.unlink(tmpLocal); } catch {}
           try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
+          logOk('Database push completed');
         }
       }
 
@@ -105,7 +108,7 @@ export default function push(): Command {
         await runHook(local.hooks?.push?.after);
         await runHook(remote.hooks?.push?.after, { ...remote.ssh, path: remote.ssh.path });
       }
-      console.log('Push completed');
+  logOk('Push completed');
     });
   return cmd;
 }
