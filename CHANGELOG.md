@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-09-20
+- Release workflow: add manual `workflow_dispatch` with tag input; checkout specified tag.
+- README: add Release workflow badge and npm downloads badge.
+
 ## [0.3.0] - 2025-09-20
 - Colorized CLI output with clear `[local]` and `[remote]` labels.
 - rsync now streams per-file changes live; dry-run lists files using `--itemize-changes` and recursive include patterns.

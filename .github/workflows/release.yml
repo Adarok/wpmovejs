@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g., v0.3.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,6 +22,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout tag (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          git fetch --tags --force
+          git checkout "${{ inputs.tag }}"
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
@@ -34,7 +48,11 @@ jobs:
       - name: Verify tag matches package.json version
         id: version
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+          fi
           PKG_VERSION=$(node -p "require('./package.json').version")
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "pkg=$PKG_VERSION" >> $GITHUB_OUTPUT
