@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { state, logVerbose } from '../state.js';
+import { logVerbose } from '../state.js';
 
 export async function whichCmd(cmd: string): Promise<string | null> {
   try {

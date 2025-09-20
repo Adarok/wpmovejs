@@ -8,12 +8,6 @@ import { computeUrlPairs } from '../utils/urls.js';
 import { rsync, ssh, shQuote } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { resolveTargets } from '../utils/targets.js';
-
-function ensureSlash(p: string) {
-  if (!p.startsWith('/')) p = '/' + p;
-  if (!p.endsWith('/')) p = p + '/';
-  return p;
-}
 import { wp } from '../services/wpcli.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';

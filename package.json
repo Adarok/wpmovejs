@@ -11,6 +11,8 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
     "clean": "rm -rf dist",
     "start": "node dist/cli.js --help",
     "prepublishOnly": "npm run build"
@@ -31,6 +33,10 @@
   },
   "devDependencies": {
     "@types/node": "^24",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.11.0",
+    "eslint-config-prettier": "^9.1.0",
     "tsup": "^8.2.4",
     "typescript": "^5.6.3"
   },

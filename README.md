@@ -1,5 +1,7 @@
 # wpmovejs
 
+[![npm version](https://img.shields.io/npm/v/%40adarok%2Fwpmovejs.svg)](https://www.npmjs.com/package/@adarok/wpmovejs)
+
 TypeScript/Node.js CLI to move/sync WordPress between environments. Inspired by the Ruby tool "wordmove" with a modern, explicit UX.
 
 ## Requirements
@@ -11,8 +13,9 @@ TypeScript/Node.js CLI to move/sync WordPress between environments. Inspired by 
 
 ## Install
 
-- Global:
+- Primary (npmjs.com):
   - `npm i -g @adarok/wpmovejs`
+  - Package: https://www.npmjs.com/package/@adarok/wpmovejs
 - Project-local:
   - `npm i -D @adarok/wpmovejs`
   - `npx wpmovejs --help`
