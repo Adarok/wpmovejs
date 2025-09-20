@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-09-20
+- Add MIT LICENSE file to the repository.
+
 ## [0.3.1] - 2025-09-20
 - Release workflow: add manual `workflow_dispatch` with tag input; checkout specified tag.
 - README: add Release workflow badge and npm downloads badge.
