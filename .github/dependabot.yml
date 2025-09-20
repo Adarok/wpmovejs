@@ -9,3 +9,40 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      prod-minor-patch:
+        applies-to: version-updates
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      dev-minor-patch:
+        applies-to: version-updates
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "@types/*"
+      eslint-stack:
+        applies-to: version-updates
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+        update-types:
+          - minor
+          - patch
+          - major
+      types:
+        applies-to: version-updates
+        patterns:
+          - "@types/*"
+        update-types:
+          - minor
+          - patch
