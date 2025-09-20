@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2025-09-20
+- Add ESLint (flat config) with CI lint step; fix initial warnings.
+- Dependabot: group npm updates to reduce PR noise.
+- README: add npm badge and highlight npmjs.com as the primary install method.
+
 ## [0.2.0] - 2025-09-20
 ## [0.2.1] - 2025-09-20
 - Release automation triggers on semver tag push (`v*.*.*`).
