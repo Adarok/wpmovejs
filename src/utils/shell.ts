@@ -17,13 +17,28 @@ export async function run(
   args: string[],
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; stdio?: 'inherit' | 'pipe' } = {}
 ) {
-  logVerbose(chalk.gray('$'), chalk.white(cmd), chalk.gray(args.join(' ')));
+  const shownArgs = maskSecrets(args.join(' '));
+  logVerbose(chalk.gray('$'), chalk.white(cmd), chalk.gray(shownArgs));
   return execa(cmd, args, { cwd: opts.cwd, env: opts.env, stdio: opts.stdio ?? 'inherit' });
 }
 
-export async function ssh(user: string, host: string, command: string, port = 22) {
-  console.log(labels.remote, chalk.white('ssh'), chalk.gray(`${user}@${host}:${port}`), chalk.gray(command));
-  return run('ssh', ['-p', String(port), `${user}@${host}`, command]);
+function maskSecrets(input: string): string {
+  // Mask MySQL-style inline passwords like -ppassword, MYSQL_PWD=secret
+  let out = input.replace(/-p[^\s'";|&]+/g, '-p****');
+  out = out.replace(/MYSQL_PWD=[^\s'";|&]+/g, 'MYSQL_PWD=****');
+  return out;
+}
+
+export async function ssh(
+  user: string,
+  host: string,
+  command: string,
+  port = 22,
+  opts: { stdio?: 'inherit' | 'pipe' } = {}
+) {
+  const shown = maskSecrets(command);
+  console.log(labels.remote, chalk.white('ssh'), chalk.gray(`${user}@${host}:${port}`), chalk.gray(shown));
+  return run('ssh', ['-p', String(port), `${user}@${host}`, command], { stdio: opts.stdio });
 }
 
 export async function rsync(

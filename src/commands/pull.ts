@@ -25,6 +25,7 @@ export default function pull(): Command {
   .option('-m, --mu-plugins', 'include mu-plugins')
   .option('-l, --languages', 'include languages')
   .option('-d, --db', 'include database')
+  .option('--mysql', 'use remote mysql/mysqldump instead of wp-cli for DB operations')
   .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
   .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
     .option('--dry-run', 'show what would be done', false)
@@ -36,11 +37,13 @@ export default function pull(): Command {
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
 
-      const targets = resolveTargets(opts as any);
+  const targets = resolveTargets(opts as any);
 
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
+      let remoteWpAvailable = true;
       if (!isDry) {
-        await preflight(local, remote, { targets, operation: 'pull' });
+        const res = await preflight(local, remote, { targets, operation: 'pull', forceMysql: Boolean(opts.mysql) });
+        remoteWpAvailable = res.remoteWpAvailable;
       }
       if (!isDry) {
         await runHook(local.hooks?.pull?.before);
@@ -79,13 +82,33 @@ export default function pull(): Command {
         const tmpRemote = `${remoteDir}/wpmovejs-${Date.now()}.sql`;
         const tmpLocal = path.join(os.tmpdir(), path.basename(tmpRemote));
 
-        await wp(['db', 'export', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+        if (opts.mysql || !remoteWpAvailable) {
+          // Fallback: remote dump using mysqldump with credentials
+          const db = remote.db!;
+          const creds = [
+            `-h${db.host}`,
+            `-u${db.user}`,
+            db.password ? `-p${db.password}` : '',
+            db.name,
+          ].filter(Boolean).join(' ');
+          await ssh(
+            remote.ssh.user,
+            remote.ssh.host,
+            `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} > ${shQuote(tmpRemote)}`)}`,
+            remote.ssh.port,
+            { stdio: 'pipe' }
+          );
+        } else {
+          await wp(['db', 'export', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+        }
           await rsync(`${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, tmpLocal, { ssh: remote.ssh, dryRun: false });
         await wp(['db', 'import', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
 
-        const pairs = computeUrlPairs(remote, local);
-        for (const p of pairs) {
-          await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
+        if (!(opts.mysql || !remoteWpAvailable)) {
+          const pairs = computeUrlPairs(remote, local);
+          for (const p of pairs) {
+            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
+          }
         }
 
   try { await fs.promises.unlink(tmpLocal); } catch {}

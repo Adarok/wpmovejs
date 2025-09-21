@@ -25,6 +25,7 @@ export default function push(): Command {
   .option('-m, --mu-plugins', 'include mu-plugins')
   .option('-l, --languages', 'include languages')
   .option('-d, --db', 'include database')
+  .option('--mysql', 'use remote mysql/mysqldump instead of wp-cli for DB operations')
   .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
   .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
     .option('--dry-run', 'show what would be done', false)
@@ -41,8 +42,10 @@ export default function push(): Command {
       const targets = resolveTargets(opts as any);
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
 
+      let remoteWpAvailable = true;
       if (!isDry) {
-        await preflight(local, remote, { targets, operation: 'push' });
+        const res = await preflight(local, remote, { targets, operation: 'push', forceMysql: Boolean(opts.mysql) });
+        remoteWpAvailable = res.remoteWpAvailable;
       }
 
       if (!isDry) {
@@ -91,20 +94,48 @@ export default function push(): Command {
         } else {
           logInfo('Database push: export local → import remote and search-replace');
           const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
+          const transformedLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}-sr.sql`);
           const tmpBase = path.basename(tmpLocal);
           const remoteDir = remote.ssh.path;
           const tmpRemote = `${remoteDir}/${tmpBase}`;
 
-          await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-          await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
-          await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+          if (opts.mysql || !remoteWpAvailable) {
+            // Create transformed SQL locally without modifying DB, then import remotely via mysql
+            const pairs = computeUrlPairs(local, remote);
+            const flatPairs = pairs.flatMap((p) => [p.search, p.replace]);
+            await wp(['search-replace', ...flatPairs, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root', `--export=${transformedLocal}`], { bin: local.wp_cli, cwd: local.wordpress_path });
+            await rsync(transformedLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+            // Fallback: use mysql client to import
+            const db = remote.db!;
+            const mysqlCreds = [
+              `-h${db.host}`,
+              `-u${db.user}`,
+              db.password ? `-p${db.password}` : '',
+              db.name,
+            ].filter(Boolean).join(' ');
+            const mysqlCmd = `mysql ${mysqlCreds} < ${shQuote(tmpRemote)}`;
+            await ssh(
+              remote.ssh.user,
+              remote.ssh.host,
+              `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${mysqlCmd}`)}`,
+              remote.ssh.port,
+              { stdio: 'pipe' }
+            );
+          } else {
+            await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+            await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+            await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+          }
 
-          const pairs = computeUrlPairs(local, remote);
-          for (const p of pairs) {
-            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+          if (!(opts.mysql || !remoteWpAvailable)) {
+            const pairs = computeUrlPairs(local, remote);
+            for (const p of pairs) {
+              await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+            }
           }
 
           try { await fs.promises.unlink(tmpLocal); } catch {}
+          try { await fs.promises.unlink(transformedLocal); } catch {}
           try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
           logOk('Database push completed');
         }

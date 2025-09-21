@@ -3,13 +3,17 @@ import path from 'node:path';
 import { Env } from './config.js';
 import { run, shQuote, whichCmd } from './utils/shell.js';
 import { Target } from './utils/targets.js';
-import { labels, logInfo } from './state.js';
+import { labels, logInfo, logWarn } from './state.js';
 
 function hasFileTargets(targets: Target[]): boolean {
   return targets.some((t) => t !== 'db');
 }
 
-export async function preflight(local: Env, remote: Env, opts: { targets: Target[]; operation: 'push' | 'pull' }) {
+export async function preflight(
+  local: Env,
+  remote: Env,
+  opts: { targets: Target[]; operation: 'push' | 'pull'; forceMysql?: boolean }
+): Promise<{ remoteWpAvailable: boolean }> {
   const wpLocal = local.wordpress_path ?? '.';
   const localRoot = path.resolve(process.cwd(), wpLocal);
 
@@ -54,6 +58,7 @@ export async function preflight(local: Env, remote: Env, opts: { targets: Target
   }
 
   // wp-cli availability when DB involved
+  let remoteWpAvailable = true;
   if (opts.targets.includes('db')) {
     // Local wp
     const wpBin = local.wp_cli ?? 'wp';
@@ -65,9 +70,30 @@ export async function preflight(local: Env, remote: Env, opts: { targets: Target
     try {
       await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, remoteWpCheck], { stdio: 'pipe' });
     } catch {
-      throw new Error('Remote wp-cli not found in PATH');
+      remoteWpAvailable = false;
+      logWarn('Remote wp-cli not found; will fall back to mysql/mysqldump if needed');
+    }
+
+    // If remote wp-cli is not available or forced mysql, verify mysql tools exist remotely
+    if (opts.forceMysql || !remoteWpAvailable) {
+      if (!remote.db || !remote.db.name || !remote.db.user || !remote.db.host) {
+        throw new Error('Remote db credentials (host,name,user) are required for mysql/mysqldump fallback');
+      }
+      const checkMysql = `sh -lc ${shQuote('command -v mysql >/dev/null 2>&1')}`;
+      const checkDump = `sh -lc ${shQuote('command -v mysqldump >/dev/null 2>&1')}`;
+      try {
+        await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, checkMysql], { stdio: 'pipe' });
+      } catch {
+        throw new Error('Remote mysql client not found in PATH');
+      }
+      try {
+        await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, checkDump], { stdio: 'pipe' });
+      } catch {
+        throw new Error('Remote mysqldump not found in PATH');
+      }
     }
   }
 
   console.log(labels.ok, 'Preflight checks passed');
+  return { remoteWpAvailable };
 }
