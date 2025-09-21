@@ -103,12 +103,10 @@ export default function pull(): Command {
         }
           await rsync(`${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, tmpLocal, { ssh: remote.ssh, dryRun: false });
         await wp(['db', 'import', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-
-        if (!(opts.mysql || !remoteWpAvailable)) {
-          const pairs = computeUrlPairs(remote, local);
-          for (const p of pairs) {
-            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
-          }
+        // Always run local search-replace after import (both fallback and normal paths)
+        const pairs = computeUrlPairs(remote, local);
+        for (const p of pairs) {
+          await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
         }
 
   try { await fs.promises.unlink(tmpLocal); } catch {}

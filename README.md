@@ -121,6 +121,7 @@ production:
 - `init`: Create a comprehensive `wpmove.yml` template.
 - `doctor --environment <env>`: Verify prerequisites and validate config.
 - `list`: Show configured environments and their targets.
+- `browse [-e <env>]`: Open the first URL from `env.urls` in your default browser. macOS uses `open`, Windows uses `start`, Linux tries `xdg-open` then fallbacks.
 - `push -e <env>`: Push db/files from local to `<env>`.
 - `pull -e <env>`: Pull db/files from `<env>` to local.
 - `ssh -e <env> [cmd...]`: Open interactive SSH or run a remote command (cd to `ssh.path` by default; `--no-cd` to disable).
@@ -163,6 +164,11 @@ Shells:
 wp-cli passthrough:
 - `wpmovejs wp -e staging plugin list --format=json`
 - `wpmovejs wp -e staging search-replace https://staging.example.com https://example.com --skip-columns=guid --all-tables`
+
+Browse:
+- `wpmovejs browse` (uses `local` environment by default)
+- `wpmovejs browse -e production`
+  - Requires at least one URL defined in `env.urls`.
 
 ## Tips
 
