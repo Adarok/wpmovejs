@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2025-09-21
+- Command: add `browse` to open the selected environment URL in the system browser (macOS, Linux, Windows supported).
+- Security/UX: mask DB passwords in logged `mysqldump`/`mysql` commands; suppress remote SSH login banners for DB ops.
+- Pull: ensure `wp search-replace` always runs at the end after import, including mysql/mysqldump fallback.
+
 ## [0.3.2] - 2025-09-20
 - Add MIT LICENSE file to the repository.
 
