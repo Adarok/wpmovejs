@@ -11,7 +11,7 @@ import { computeUrlPairs } from '../utils/urls.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
 import { resolveTargets } from '../utils/targets.js';
-import { logDry, logInfo, logOk } from '../state.js';
+import { logDry, logInfo, logOk, logWarn } from '../state.js';
 import { preflight } from '../preflight.js';
 
 export default function pull(): Command {
@@ -91,13 +91,32 @@ export default function pull(): Command {
             db.password ? `-p${db.password}` : '',
             db.name,
           ].filter(Boolean).join(' ');
-          await ssh(
-            remote.ssh.user,
-            remote.ssh.host,
-            `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
-            remote.ssh.port,
-            { stdio: 'pipe' }
-          );
+
+          // Try with --set-gtid-purged=OFF first (supported in MySQL 5.6+/MariaDB 10.0+)
+          // Fall back without it if the flag is not recognized
+          try {
+            await ssh(
+              remote.ssh.user,
+              remote.ssh.host,
+              `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
+              remote.ssh.port,
+              { stdio: 'pipe' }
+            );
+          } catch (err: any) {
+            // Check if error is due to unknown variable
+            if (err?.message?.includes('unknown variable') || err?.message?.includes('set-gtid-purged')) {
+              logWarn('mysqldump --set-gtid-purged not supported, retrying without it');
+              await ssh(
+                remote.ssh.user,
+                remote.ssh.host,
+                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction > ${shQuote(tmpRemote)}`)}`,
+                remote.ssh.port,
+                { stdio: 'pipe' }
+              );
+            } else {
+              throw err;
+            }
+          }
         } else {
           await wp(['db', 'export', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
         }
