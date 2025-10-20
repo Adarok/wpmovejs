@@ -99,44 +99,47 @@ export default function push(): Command {
           const remoteDir = remote.ssh.path;
           const tmpRemote = `${remoteDir}/${tmpBase}`;
 
-          if (opts.mysql || !remoteWpAvailable) {
-            // Create transformed SQL locally without modifying DB, then import remotely via mysql
-            const pairs = computeUrlPairs(local, remote);
-            const flatPairs = pairs.flatMap((p) => [p.search, p.replace]);
-            await wp(['search-replace', ...flatPairs, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root', `--export=${transformedLocal}`], { bin: local.wp_cli, cwd: local.wordpress_path });
-            await rsync(transformedLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
-            // Fallback: use mysql client to import
-            const db = remote.db!;
-            const mysqlCreds = [
-              `-h${db.host}`,
-              `-u${db.user}`,
-              db.password ? `-p${db.password}` : '',
-              db.name,
-            ].filter(Boolean).join(' ');
-            const mysqlCmd = `mysql ${mysqlCreds} < ${shQuote(tmpRemote)}`;
-            await ssh(
-              remote.ssh.user,
-              remote.ssh.host,
-              `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${mysqlCmd}`)}`,
-              remote.ssh.port,
-              { stdio: 'pipe' }
-            );
-          } else {
-            await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-            await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
-            await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
-          }
-
-          if (!(opts.mysql || !remoteWpAvailable)) {
-            const pairs = computeUrlPairs(local, remote);
-            for (const p of pairs) {
-              await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+          try {
+            if (opts.mysql || !remoteWpAvailable) {
+              // Create transformed SQL locally without modifying DB, then import remotely via mysql
+              const pairs = computeUrlPairs(local, remote);
+              const flatPairs = pairs.flatMap((p) => [p.search, p.replace]);
+              await wp(['search-replace', ...flatPairs, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root', `--export=${transformedLocal}`], { bin: local.wp_cli, cwd: local.wordpress_path });
+              await rsync(transformedLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+              // Fallback: use mysql client to import
+              const db = remote.db!;
+              const mysqlCreds = [
+                `-h${db.host}`,
+                `-u${db.user}`,
+                db.password ? `-p${db.password}` : '',
+                db.name,
+              ].filter(Boolean).join(' ');
+              const mysqlCmd = `mysql ${mysqlCreds} < ${shQuote(tmpRemote)}`;
+              await ssh(
+                remote.ssh.user,
+                remote.ssh.host,
+                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${mysqlCmd}`)}`,
+                remote.ssh.port,
+                { stdio: 'pipe' }
+              );
+            } else {
+              await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+              await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+              await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
             }
-          }
 
-          try { await fs.promises.unlink(tmpLocal); } catch {}
-          try { await fs.promises.unlink(transformedLocal); } catch {}
-          try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
+            if (!(opts.mysql || !remoteWpAvailable)) {
+              const pairs = computeUrlPairs(local, remote);
+              for (const p of pairs) {
+                await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+              }
+            }
+          } finally {
+            // Always clean up temp files, even if operation fails
+            try { await fs.promises.unlink(tmpLocal); } catch {}
+            try { await fs.promises.unlink(transformedLocal); } catch {}
+            try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
+          }
           logOk('Database push completed');
         }
       }

@@ -82,54 +82,57 @@ export default function pull(): Command {
         const tmpRemote = `${remoteDir}/wpmovejs-${Date.now()}.sql`;
         const tmpLocal = path.join(os.tmpdir(), path.basename(tmpRemote));
 
-        if (opts.mysql || !remoteWpAvailable) {
-          // Fallback: remote dump using mysqldump with credentials
-          const db = remote.db!;
-          const creds = [
-            `-h${db.host}`,
-            `-u${db.user}`,
-            db.password ? `-p${db.password}` : '',
-            db.name,
-          ].filter(Boolean).join(' ');
+        try {
+          if (opts.mysql || !remoteWpAvailable) {
+            // Fallback: remote dump using mysqldump with credentials
+            const db = remote.db!;
+            const creds = [
+              `-h${db.host}`,
+              `-u${db.user}`,
+              db.password ? `-p${db.password}` : '',
+              db.name,
+            ].filter(Boolean).join(' ');
 
-          // Try with --set-gtid-purged=OFF first (supported in MySQL 5.6+/MariaDB 10.0+)
-          // Fall back without it if the flag is not recognized
-          try {
-            await ssh(
-              remote.ssh.user,
-              remote.ssh.host,
-              `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
-              remote.ssh.port,
-              { stdio: 'pipe' }
-            );
-          } catch (err: any) {
-            // Check if error is due to unknown variable
-            if (err?.message?.includes('unknown variable') || err?.message?.includes('set-gtid-purged')) {
-              logWarn('mysqldump --set-gtid-purged not supported, retrying without it');
+            // Try with --set-gtid-purged=OFF first (supported in MySQL 5.6+/MariaDB 10.0+)
+            // Fall back without it if the flag is not recognized
+            try {
               await ssh(
                 remote.ssh.user,
                 remote.ssh.host,
-                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction > ${shQuote(tmpRemote)}`)}`,
+                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
                 remote.ssh.port,
                 { stdio: 'pipe' }
               );
-            } else {
-              throw err;
+            } catch (err: any) {
+              // Check if error is due to unknown variable
+              if (err?.message?.includes('unknown variable') || err?.message?.includes('set-gtid-purged')) {
+                logWarn('mysqldump --set-gtid-purged not supported, retrying without it');
+                await ssh(
+                  remote.ssh.user,
+                  remote.ssh.host,
+                  `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction > ${shQuote(tmpRemote)}`)}`,
+                  remote.ssh.port,
+                  { stdio: 'pipe' }
+                );
+              } else {
+                throw err;
+              }
             }
+          } else {
+            await wp(['db', 'export', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
           }
-        } else {
-          await wp(['db', 'export', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
-        }
           await rsync(`${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, tmpLocal, { ssh: remote.ssh, dryRun: false });
-        await wp(['db', 'import', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-        // Always run local search-replace after import (both fallback and normal paths)
-        const pairs = computeUrlPairs(remote, local);
-        for (const p of pairs) {
-          await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
+          await wp(['db', 'import', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+          // Always run local search-replace after import (both fallback and normal paths)
+          const pairs = computeUrlPairs(remote, local);
+          for (const p of pairs) {
+            await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
+          }
+        } finally {
+          // Always clean up temp files, even if operation fails
+          try { await fs.promises.unlink(tmpLocal); } catch {}
+          try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
         }
-
-  try { await fs.promises.unlink(tmpLocal); } catch {}
-  try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(tmpRemote)}`, remote.ssh.port); } catch {}
         logOk('Database pull completed');
         }
       }
