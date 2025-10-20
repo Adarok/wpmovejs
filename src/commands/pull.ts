@@ -94,7 +94,7 @@ export default function pull(): Command {
           await ssh(
             remote.ssh.user,
             remote.ssh.host,
-            `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} > ${shQuote(tmpRemote)}`)}`,
+            `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
             remote.ssh.port,
             { stdio: 'pipe' }
           );

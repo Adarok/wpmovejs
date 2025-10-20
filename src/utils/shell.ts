@@ -33,12 +33,16 @@ export async function ssh(
   user: string,
   host: string,
   command: string,
-  port = 22,
+  port?: number,
   opts: { stdio?: 'inherit' | 'pipe' } = {}
 ) {
   const shown = maskSecrets(command);
-  console.log(labels.remote, chalk.white('ssh'), chalk.gray(`${user}@${host}:${port}`), chalk.gray(shown));
-  return run('ssh', ['-p', String(port), `${user}@${host}`, command], { stdio: opts.stdio });
+  const target = port ? `${user}@${host}:${port}` : `${user}@${host}`;
+  console.log(labels.remote, chalk.white('ssh'), chalk.gray(target), chalk.gray(shown));
+  const args = [] as string[];
+  if (port) args.push('-p', String(port));
+  args.push(`${user}@${host}`, command);
+  return run('ssh', args, { stdio: opts.stdio });
 }
 
 export async function rsync(
@@ -57,9 +61,16 @@ export async function rsync(
   if (opts.dryRun) args.push('--dry-run');
   // Enable detailed per-file output
   args.push('--itemize-changes', '--info=NAME,SKIP,DEL,REMOVE,STATS');
-  for (const inc of opts.includes ?? []) args.push('--include', inc);
+  const includes = opts.includes ?? [];
+  const parentIncludes = includes.filter((i) => !i.endsWith('/***'));
+  const recursiveIncludes = includes.filter((i) => i.endsWith('/***'));
+  for (const inc of parentIncludes) args.push('--include', inc);
   for (const exc of opts.excludes ?? []) args.push('--exclude', exc);
-  if (opts.ssh) args.push('-e', `ssh -p ${opts.ssh.port ?? 22}`);
+  for (const inc of recursiveIncludes) args.push('--include', inc);
+  if (opts.ssh) {
+    const sshCmd = opts.ssh.port ? `ssh -p ${opts.ssh.port}` : 'ssh';
+    args.push('-e', sshCmd);
+  }
   args.push(src, dest);
   const direction = src.includes('@') ? `${chalk.magenta('remote')} → ${chalk.cyan('local')}` : `${chalk.cyan('local')} → ${chalk.magenta('remote')}`;
   console.log(labels.info, chalk.white('rsync'), chalk.gray(direction));

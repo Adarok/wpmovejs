@@ -21,11 +21,11 @@ export default function shell(): Command {
         return;
       }
 
-      const userAtHost = `${env.ssh.user}@${env.ssh.host}`;
-      const port = env.ssh.port ?? 22;
+  const userAtHost = `${env.ssh.user}@${env.ssh.host}`;
+  const port = env.ssh.port ? Number(env.ssh.port) : undefined;
       const cdPrefix = shouldCd && env.ssh?.path ? `cd ${shQuote(env.ssh.path)} && ` : '';
       const remoteCmd = `${cdPrefix}${env.wp_cli ?? 'wp'} shell`;
-      await run('ssh', ['-t', '-p', String(port), userAtHost, remoteCmd]);
+  await run('ssh', ['-t', ...(port ? ['-p', String(port)] : []), userAtHost, remoteCmd]);
     });
 
   return cmd;

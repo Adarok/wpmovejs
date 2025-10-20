@@ -38,9 +38,12 @@ export async function preflight(
   if (!remote.ssh) throw new Error('Remote ssh configuration missing');
   const ssh = remote.ssh;
   try {
-    await run('ssh', ['-o', 'BatchMode=yes', '-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, 'true'], { stdio: 'pipe' });
+    const args = ['-o', 'BatchMode=yes'] as string[];
+    if (ssh.port) args.push('-p', String(ssh.port));
+    args.push(`${ssh.user}@${ssh.host}`, 'true');
+    await run('ssh', args, { stdio: 'pipe' });
   } catch (_e) {
-    throw new Error(`SSH connectivity failed to ${ssh.user}@${ssh.host}:${ssh.port ?? 22}`);
+    throw new Error(`SSH connectivity failed to ${ssh.user}@${ssh.host}${ssh.port ? `:${ssh.port}` : ''}`);
   }
 
   // Remote path checks
@@ -49,7 +52,10 @@ export async function preflight(
     : `test -d ${shQuote(ssh.path)}`;
 
   try {
-    await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, remotePathCmd], { stdio: 'pipe' });
+    const args = [] as string[];
+    if (ssh.port) args.push('-p', String(ssh.port));
+    args.push(`${ssh.user}@${ssh.host}`, remotePathCmd);
+    await run('ssh', args, { stdio: 'pipe' });
   } catch {
     if (opts.operation === 'push' && hasFileTargets(opts.targets)) {
       throw new Error(`Remote path missing or not writable: ${ssh.path}`);
@@ -68,7 +74,10 @@ export async function preflight(
     // Remote wp presence
     const remoteWpCheck = `sh -lc ${shQuote('command -v wp >/dev/null 2>&1')}`;
     try {
-      await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, remoteWpCheck], { stdio: 'pipe' });
+      const args = [] as string[];
+      if (ssh.port) args.push('-p', String(ssh.port));
+      args.push(`${ssh.user}@${ssh.host}`, remoteWpCheck);
+      await run('ssh', args, { stdio: 'pipe' });
     } catch {
       remoteWpAvailable = false;
       logWarn('Remote wp-cli not found; will fall back to mysql/mysqldump if needed');
@@ -82,12 +91,18 @@ export async function preflight(
       const checkMysql = `sh -lc ${shQuote('command -v mysql >/dev/null 2>&1')}`;
       const checkDump = `sh -lc ${shQuote('command -v mysqldump >/dev/null 2>&1')}`;
       try {
-        await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, checkMysql], { stdio: 'pipe' });
+        const args = [] as string[];
+        if (ssh.port) args.push('-p', String(ssh.port));
+        args.push(`${ssh.user}@${ssh.host}`, checkMysql);
+        await run('ssh', args, { stdio: 'pipe' });
       } catch {
         throw new Error('Remote mysql client not found in PATH');
       }
       try {
-        await run('ssh', ['-p', String(ssh.port ?? 22), `${ssh.user}@${ssh.host}`, checkDump], { stdio: 'pipe' });
+        const args = [] as string[];
+        if (ssh.port) args.push('-p', String(ssh.port));
+        args.push(`${ssh.user}@${ssh.host}`, checkDump);
+        await run('ssh', args, { stdio: 'pipe' });
       } catch {
         throw new Error('Remote mysqldump not found in PATH');
       }

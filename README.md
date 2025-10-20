@@ -176,6 +176,7 @@ Browse:
 - Keep `urls` accurate to avoid broken serialized data.
 - Add sensitive files (like `wp-config.php`, `.env`) to `exclude` to be extra safe.
 - `.env` is auto-loaded; use `--verbose` for troubleshooting.
+- SSH config precedence: if you do not set `ssh.port` in `wpmove.yml`, wpmovejs defers to your `~/.ssh/config` Host settings (including Port, IdentityFile, ProxyJump, etc.). If you set `ssh.port`, that explicit value is used.
 
 ## Development
 

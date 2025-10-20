@@ -9,6 +9,7 @@ import shell from './shell';
 import db from './db';
 import wp from './wp';
 import browse from './browse';
+import migrate from './migrate';
 
 export function registerCommands(program: Command) {
   program.addCommand(init().showHelpAfterError());
@@ -20,5 +21,6 @@ export function registerCommands(program: Command) {
   program.addCommand(shell().showHelpAfterError());
   program.addCommand(db().showHelpAfterError());
   program.addCommand(wp().showHelpAfterError());
+  program.addCommand(migrate().showHelpAfterError());
   program.addCommand(browse().showHelpAfterError());
 }

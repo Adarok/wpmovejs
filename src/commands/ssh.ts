@@ -15,8 +15,8 @@ export default function sshCmd(): Command {
       const remote = getEnv(cfg, envName);
       if (!remote.ssh) throw new Error(`Environment '${envName}' has no ssh config`);
 
-      const userAtHost = `${remote.ssh.user}@${remote.ssh.host}`;
-      const port = remote.ssh.port ?? 22;
+  const userAtHost = `${remote.ssh.user}@${remote.ssh.host}`;
+  const port = remote.ssh.port ? Number(remote.ssh.port) : undefined;
       const hasCmd = Array.isArray(cmdParts) && cmdParts.length > 0;
       const shouldCd = opts.cd !== false && Boolean(remote.ssh.path);
       const cdPrefix = shouldCd ? `cd ${shQuote(remote.ssh.path!)} && ` : '';
@@ -25,16 +25,16 @@ export default function sshCmd(): Command {
         if (shouldCd) {
           // Allocate a PTY and start a login shell after cd into the configured path
           const remoteCmd = `${cdPrefix}exec ${'${SHELL:-bash}'} -l`;
-          await run('ssh', ['-t', '-p', String(port), userAtHost, remoteCmd]);
+          await run('ssh', ['-t', ...(port ? ['-p', String(port)] : []), userAtHost, remoteCmd]);
         } else {
           // Plain interactive session with a fallback
-          await run('ssh', ['-t', '-p', String(port), userAtHost, 'exec ${SHELL:-bash} -l']);
+          await run('ssh', ['-t', ...(port ? ['-p', String(port)] : []), userAtHost, 'exec ${SHELL:-bash} -l']);
         }
         return;
       }
 
       const remoteCmd = cdPrefix + cmdParts.join(' ');
-      await run('ssh', ['-t', '-p', String(port), userAtHost, remoteCmd]);
+  await run('ssh', ['-t', ...(port ? ['-p', String(port)] : []), userAtHost, remoteCmd]);
     });
 
   return cmd;
