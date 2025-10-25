@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2025-10-25
+- Database: Fix mysqldump GTID compatibility with fallback for older MySQL/MariaDB versions.
+- Database: Ensure remote SQL dumps are always cleaned up via try-finally blocks.
+- Database: Add `*.sql` to default excludes to prevent SQL dumps from being synced.
+- Database: Fix search-replace to run separate commands for URL and wordpress_path replacements.
+- Database: Simplify push mysql fallback to match wordmove approach (backup→modify→export→restore).
+- Rsync: Enable `--delete` flag for file operations to remove orphaned files on destination.
+- Rsync: Add `-l` flag to preserve symbolic links during sync operations.
+- Rsync: Enhanced output with phase labels (Themes, Plugins, Uploads, etc.) and color-coded file actions.
+- Rsync: Parse itemize output to show user-friendly ADD/UPD/DEL/DIR labels with summary counts.
+
 ## [0.3.3] - 2025-09-21
 - Command: add `browse` to open the selected environment URL in the system browser (macOS, Linux, Windows supported).
 - Security/UX: mask DB passwords in logged `mysqldump`/`mysql` commands; suppress remote SSH login banners for DB ops.
