@@ -62,29 +62,29 @@ export default function push(): Command {
   const themesRel = paths.themes;
   const languagesRel = paths.languages;
 
-        const syncOpts = buildRsyncOpts(local, remote, { ssh: remote.ssh, dryRun: opts.dryRun });
+        const syncOpts = buildRsyncOpts(local, remote, { ssh: remote.ssh, dryRun: opts.dryRun, delete: true });
       // Sync from the WP root so filters behave consistently
       const srcRoot = localWp.endsWith('/') ? localWp : localWp + '/';
       const dstRoot = remotePath + '/';
       if (targets.includes('wordpress')) {
         const wpContentRel = resolvePaths(local).wp_content;
         const excludes = ['/' + wpContentRel.replace(/^\/?/, '') + '/*', ...DEFAULT_WORDPRESS_EXCLUDES, ...(syncOpts.excludes ?? [])];
-        await rsync(srcRoot, dstRoot, { ...syncOpts, excludes });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, excludes, label: 'WordPress core' });
       }
       if (targets.includes('uploads')) {
-        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes) });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes), label: 'Uploads' });
       }
       if (targets.includes('plugins')) {
-        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel), excludes: excludePathsFor(pluginsRel, syncOpts.excludes) });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel), excludes: excludePathsFor(pluginsRel, syncOpts.excludes), label: 'Plugins' });
       }
       if (targets.includes('mu-plugins')) {
-        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(muPluginsRel), excludes: excludePathsFor(muPluginsRel, syncOpts.excludes) });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(muPluginsRel), excludes: excludePathsFor(muPluginsRel, syncOpts.excludes), label: 'MU-Plugins' });
       }
       if (targets.includes('themes')) {
-        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel), excludes: excludePathsFor(themesRel, syncOpts.excludes) });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel), excludes: excludePathsFor(themesRel, syncOpts.excludes), label: 'Themes' });
       }
       if (targets.includes('languages')) {
-        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes) });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes), label: 'Languages' });
       }
 
       // Run DB last to ensure files/plugins are present for wp-cli operations
@@ -101,18 +101,33 @@ export default function push(): Command {
 
           try {
             if (opts.mysql || !remoteWpAvailable) {
-              // Create transformed SQL locally without modifying DB, then import remotely via mysql
+              // Fallback: Create transformed SQL locally, then import remotely via mysql
+              // Similar to wordmove: export, modify DB, export again, restore original
               const pairs = computeUrlPairs(local, remote);
-              const flatPairs = pairs.flatMap((p) => [p.search, p.replace]);
-              await wp(['search-replace', ...flatPairs, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root', `--export=${transformedLocal}`], { bin: local.wp_cli, cwd: local.wordpress_path });
+
+              // 1. Backup current local database
+              await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+
+              // 2. Run search-replace on live local database (one command per pair)
+              for (const p of pairs) {
+                await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
+              }
+
+              // 3. Export the transformed database
+              await wp(['db', 'export', transformedLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+
+              // 4. Restore original local database
+              await wp(['db', 'import', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+
+              // 5. Upload transformed SQL and import on remote
               await rsync(transformedLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
               // Fallback: use mysql client to import
-              const db = remote.db!;
+              const remoteDb = remote.db!;
               const mysqlCreds = [
-                `-h${db.host}`,
-                `-u${db.user}`,
-                db.password ? `-p${db.password}` : '',
-                db.name,
+                `-h${remoteDb.host}`,
+                `-u${remoteDb.user}`,
+                remoteDb.password ? `-p${remoteDb.password}` : '',
+                remoteDb.name,
               ].filter(Boolean).join(' ');
               const mysqlCmd = `mysql ${mysqlCreds} < ${shQuote(tmpRemote)}`;
               await ssh(

@@ -38,6 +38,7 @@ local:
   exclude:
     - .git/
     - node_modules/
+    - '*.sql'
   # Rsync tuning applied when this env is the destination of pull
   sync:
     excludes:
@@ -95,6 +96,7 @@ production:
   # Always ignored when syncing to this remote
   exclude:
     - .well-known/acme-challenge/
+    - '*.sql'
   # Rsync tuning applied when this env is the destination of push
   sync:
     excludes:

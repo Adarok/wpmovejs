@@ -21,6 +21,7 @@ local:
   exclude:
     - .git/
     - node_modules/
+    - '*.sql'
   # Rsync tuning applied when this env is the destination of pull
   sync:
     excludes:
@@ -63,6 +64,8 @@ production:
     user: deploy
     port: 22
     path: /var/www/html
+  # Path to WordPress installation on remote (directory containing wp-content)
+  wordpress_path: /var/www/html
   # wp-cli command on the remote host
   wp_cli: wp
   # Remote database credentials (used when pulling db from remote)
@@ -78,6 +81,7 @@ production:
   # Always ignored when syncing to this remote
   exclude:
     - .well-known/acme-challenge/
+    - '*.sql'
   # Rsync tuning applied when this env is the destination of push
   sync:
     excludes:
