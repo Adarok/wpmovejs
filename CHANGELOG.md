@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-10-25
+- Minor version bump for accumulated enhancements and improvements.
+
 ## [0.3.4] - 2025-10-25
 - Database: Fix mysqldump GTID compatibility with fallback for older MySQL/MariaDB versions.
 - Database: Ensure remote SQL dumps are always cleaned up via try-finally blocks.
