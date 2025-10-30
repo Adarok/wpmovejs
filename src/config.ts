@@ -22,7 +22,9 @@ const SshSchema = z.object({
 });
 
 const EnvSchema = z.object({
-  wordpress_path: z.string().optional(),
+  wordpress_path: z.string().refine((p: string) => p.startsWith('/'), {
+    message: 'wordpress_path must be an absolute path starting with /',
+  }).optional(),
   wp_cli: z.string().default('wp').optional(),
   ssh: SshSchema.optional(),
   db: DbSchema.optional(),

@@ -64,13 +64,13 @@ export default function pull(): Command {
       const dstRoot = localWp.endsWith('/') ? localWp : localWp + '/';
       if (targets.includes('wordpress')) {
         const excludes = ['/' + resolvePaths(remote).wp_content.replace(/^\/?/, '') + '/*', ...DEFAULT_WORDPRESS_EXCLUDES, ...(syncOpts.excludes ?? [])];
-        await rsync(srcRoot, dstRoot, { ...syncOpts, excludes, label: 'WordPress core' });
+        await rsync(srcRoot, dstRoot, { ...syncOpts, excludes });
       }
-      if (targets.includes('uploads')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes), label: 'Uploads' });
-      if (targets.includes('plugins')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel), excludes: excludePathsFor(pluginsRel, syncOpts.excludes), label: 'Plugins' });
-      if (targets.includes('mu-plugins')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(muPluginsRel), excludes: excludePathsFor(muPluginsRel, syncOpts.excludes), label: 'MU-Plugins' });
-      if (targets.includes('themes')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel), excludes: excludePathsFor(themesRel, syncOpts.excludes), label: 'Themes' });
-      if (targets.includes('languages')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes), label: 'Languages' });
+      if (targets.includes('uploads')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes) });
+      if (targets.includes('plugins')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel), excludes: excludePathsFor(pluginsRel, syncOpts.excludes) });
+      if (targets.includes('mu-plugins')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(muPluginsRel), excludes: excludePathsFor(muPluginsRel, syncOpts.excludes) });
+      if (targets.includes('themes')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel), excludes: excludePathsFor(themesRel, syncOpts.excludes) });
+      if (targets.includes('languages')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes) });
 
       // Run DB last to ensure themes/plugins/mu-plugins are present for wp-cli
       if (targets.includes('db')) {

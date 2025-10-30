@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { getEnv, loadConfig, resolvePaths } from '../config.js';
 import { whichCmd } from '../utils/shell.js';
-import path from 'node:path';
 
 export default function doctor(): Command {
   const cmd = new Command('doctor')
@@ -18,10 +17,6 @@ export default function doctor(): Command {
         const config = await loadConfig();
         const env = getEnv(config, opts.environment);
         // Basic path checks
-        const wpPath = env.wordpress_path ?? '.';
-        if (path.isAbsolute(wpPath)) {
-          missing.push(`wordpress_path should be relative to project (got absolute: ${wpPath})`);
-        }
         const p = resolvePaths(env);
         const rels = [p.wp_content, p.plugins, p.mu_plugins, p.themes, p.uploads, p.languages, p.wp_config];
         if (rels.some((r) => r.startsWith('/') || r.includes('..'))) {

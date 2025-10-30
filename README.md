@@ -38,6 +38,12 @@ wpmovejs init --force
 
 # 2) Edit wpmove.yml for your envs (local, staging, production)
 
+# OR: Sniff a remote server to auto-populate an environment
+wpmovejs sniff -e staging -s deploy@staging.example.com -p /var/www/html
+
+# With custom SSH port
+wpmovejs sniff -e production -s admin@example.com -p /home/admin/public_html --port 2222
+
 # 3) Check your setup
 wpmovejs doctor --environment local
 
@@ -58,7 +64,7 @@ wpmovejs push -e production --all --dry-run
 
 Run `wpmovejs init` to generate a full, commented template. Key fields:
 
-- `wordpress_path`: Local WordPress root (directory containing `wp-content`).
+- `wordpress_path`: WordPress root path (must be absolute, e.g., `/var/www/html`). If omitted, uses current working directory.
 - `wp_cli`: Command/binary to run wp-cli.
 - `ssh`: Remote connection (`host`, `user`, `port`, `path`).
 - `db`: Database credentials (`host`, `name`, `user`, `password`, `charset`).
@@ -72,7 +78,7 @@ Example (trimmed):
 
 ```yaml
 local:
-  wordpress_path: ./wordpress
+  wordpress_path: /var/www/html
   wp_cli: wp
   db:
     host: 127.0.0.1
@@ -121,6 +127,7 @@ production:
 - `init`: Create a comprehensive `wpmove.yml` template.
 - `doctor --environment <env>`: Verify prerequisites and validate config.
 - `list`: Show configured environments and their targets.
+- `sniff -e <env> -s <user@host> -p <path> [--port <number>]`: Connect to a remote server, read `wp-config.php`, and automatically create a new environment in `wpmove.yml`. Exits with an error if the environment already exists.
 - `browse [-e <env>]`: Open the first URL from `env.urls` in your default browser. macOS uses `open`, Windows uses `start`, Linux tries `xdg-open` then fallbacks.
 - `push -e <env>`: Push db/files from local to `<env>`.
 - `pull -e <env>`: Pull db/files from `<env>` to local.

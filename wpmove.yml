@@ -4,7 +4,8 @@
 
 local:
   # Path to your local WordPress installation (directory containing wp-content)
-  wordpress_path: ./wordpress
+  # Must be an absolute path starting with /
+  # wordpress_path: /var/www/html
   # wp-cli command/binary to use locally
   wp_cli: wp
   # Local database credentials (used when pushing db to remote)

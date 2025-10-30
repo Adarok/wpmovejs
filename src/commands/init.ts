@@ -20,8 +20,9 @@ export default function init(): Command {
 # This template includes all supported options with sensible defaults.
 
 local:
-  # Path to your local WordPress installation (directory containing wp-content)
-  wordpress_path: ./wordpress
+  # Path to your local WordPress installation (must be absolute, e.g., /var/www/html)
+  # If omitted, current working directory is used
+  # wordpress_path: /absolute/path/to/wordpress
   # wp-cli command/binary to use locally
   wp_cli: wp
   # Local database credentials (used when pushing db to remote)

@@ -10,6 +10,7 @@ import db from './db';
 import wp from './wp';
 import browse from './browse';
 import migrate from './migrate';
+import sniff from './sniff';
 
 export function registerCommands(program: Command) {
   program.addCommand(init().showHelpAfterError());
@@ -23,4 +24,5 @@ export function registerCommands(program: Command) {
   program.addCommand(wp().showHelpAfterError());
   program.addCommand(migrate().showHelpAfterError());
   program.addCommand(browse().showHelpAfterError());
+  program.addCommand(sniff().showHelpAfterError());
 }
