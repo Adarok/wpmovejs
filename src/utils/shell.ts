@@ -67,15 +67,23 @@ export async function rsync(
   // Enable detailed per-file output
   args.push('--itemize-changes');
   const includes = opts.includes ?? [];
+  const excludes = opts.excludes ?? [];
   const parentIncludes = includes.filter((i) => !i.endsWith('/***'));
   const recursiveIncludes = includes.filter((i) => i.endsWith('/***'));
-  // CRITICAL: Order matters in rsync filters!
-  // 1. First include parent directories
+
+  // Separate user excludes from hiding rules (patterns starting with /)
+  const userExcludes = excludes.filter((e) => !e.startsWith('/'));
+  const hidingRules = excludes.filter((e) => e.startsWith('/'));
+
+  // CRITICAL: Match wordmove's exact filter order - first matching rule wins!
+  // 1. First include parent directories (allows traversal into target paths)
   for (const inc of parentIncludes) args.push('--include', inc);
-  // 2. Then include recursive patterns (the actual content we want)
+  // 2. Then add hiding rules like /wp-content/* and /* (hide non-included siblings)
+  for (const hide of hidingRules) args.push('--exclude', hide);
+  // 3. Then user excludes like .git/, node_modules/ (protect from deletion and transfer)
+  for (const exc of userExcludes) args.push('--exclude', exc);
+  // 4. Finally include recursive patterns (the actual content we want)
   for (const inc of recursiveIncludes) args.push('--include', inc);
-  // 3. Finally add excludes (to filter out unwanted items)
-  for (const exc of opts.excludes ?? []) args.push('--exclude', exc);
   if (opts.ssh) {
     const sshCmd = opts.ssh.port ? `ssh -p ${opts.ssh.port}` : 'ssh';
     args.push('-e', sshCmd);

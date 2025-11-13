@@ -9,12 +9,12 @@ describe('rsyncFilters', () => {
       '/wp-content/uploads/***',
     ]);
   });
-  it('excludePathsFor excludes parents and root wildcard plus user excludes', () => {
+  it('excludePathsFor puts user excludes before hiding rules to protect files', () => {
     expect(excludePathsFor('wp-content/uploads/file.jpg', ['.git/'])).toEqual([
+      '.git/',
       '/wp-content/uploads/*',
       '/wp-content/*',
       '/*',
-      '.git/',
     ]);
   });
 });

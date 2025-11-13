@@ -35,5 +35,6 @@ export function excludePathsFor(relPath: string, userExcludes: string[] = []): s
     const pattern = base === '/' ? '/*' : base + '*';
     acc.push(pattern);
   }
-  return [...acc, ...userExcludes];
+  // CRITICAL: User excludes must come BEFORE hiding rules so they can protect files from deletion
+  return [...userExcludes, ...acc];
 }
