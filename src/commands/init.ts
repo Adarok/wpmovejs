@@ -40,6 +40,7 @@ local:
     - .git/
     - node_modules/
     - '*.sql'
+    - wpmove.yml
   # Rsync tuning applied when this env is the destination of pull
   sync:
     excludes:
@@ -98,6 +99,7 @@ production:
   exclude:
     - .well-known/acme-challenge/
     - '*.sql'
+    - wpmove.yml
   # Rsync tuning applied when this env is the destination of push
   sync:
     excludes:

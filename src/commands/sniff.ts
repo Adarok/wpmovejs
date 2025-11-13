@@ -5,7 +5,7 @@ import { parse, stringify } from 'yaml';
 import { ssh } from '../utils/shell.js';
 import { loadConfig, getEnv } from '../config.js';
 import { logInfo, logOk, logError } from '../state.js';
-import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
+import { DEFAULT_WORDPRESS_EXCLUDES, ensureWpmoveExcluded } from '../constants.js';
 import chalk from 'chalk';
 
 export default function sniff(): Command {
@@ -104,7 +104,7 @@ export default function sniff(): Command {
           charset: dbConfig.charset || 'utf8mb4',
         },
         ...(siteUrl ? { urls: [siteUrl] } : {}),
-        exclude: [...DEFAULT_WORDPRESS_EXCLUDES],
+        exclude: ensureWpmoveExcluded([...DEFAULT_WORDPRESS_EXCLUDES]),
         sync: {
           excludes: ['wp-content/cache/'],
           includes: [],

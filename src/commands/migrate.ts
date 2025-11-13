@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { logInfo, logOk, logWarn } from '../state.js';
+import { ensureWpmoveExcluded } from '../constants.js';
 
 type AnyObject = Record<string, any>;
 
@@ -53,7 +54,10 @@ function mapEnv(name: string, src: AnyObject): AnyObject {
 
   // Exclude
   if (Array.isArray(src.exclude)) {
-    out.exclude = src.exclude.filter((x: any) => typeof x === 'string' && x.trim()).map((s: string) => s.trim());
+    out.exclude = ensureWpmoveExcluded(src.exclude.filter((x: any) => typeof x === 'string' && x.trim()).map((s: string) => s.trim()));
+  } else {
+    // If no excludes in Movefile, add wpmove.yml as default
+    out.exclude = ['wpmove.yml'];
   }
 
   // Paths overrides
