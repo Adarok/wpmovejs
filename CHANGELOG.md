@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-11-13
+- **CRITICAL FIX**: Rsync filter order now matches wordmove to properly protect excluded files from deletion.
+  - Parent includes now come BEFORE hiding rules (`/wp-content/*`, `/*`)
+  - User excludes (`.git/`, `node_modules/`, etc.) now positioned between hiding rules and recursive includes
+  - This prevents `.git` and other excluded directories from being deleted when `--delete` flag is active
+- Rsync: Changed from `-l` to `-L` flag to follow symlinks and copy actual files (better for cross-server transfers)
+- Rsync: Added `--ignore-missing-args` to handle broken symlinks gracefully (exit codes 23/24 treated as warnings)
+- Config: `wordpress_path` now strictly enforced as absolute paths (must start with `/`)
+- Config: `loadConfig()` now searches upward from current directory, stopping at `wp-config.php` or filesystem root
+- Config: `wpmove.yml` automatically excluded from all sync operations via `ensureWpmoveExcluded()` helper
+- Command: Added `sniff` command to auto-discover remote WordPress configuration and create environment entry
+- Tests: Updated rsync filter tests to reflect correct ordering (user excludes before hiding rules)
+
 ## [0.4.0] - 2025-10-25
 - Minor version bump for accumulated enhancements and improvements.
 
