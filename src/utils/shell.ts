@@ -1,6 +1,6 @@
 import { execa } from 'execa';
 import chalk from 'chalk';
-import { labels, logVerbose } from '../state.js';
+import { labels, logVerbose, logWarn } from '../state.js';
 
 export async function whichCmd(cmd: string): Promise<string | null> {
   try {
@@ -57,17 +57,25 @@ export async function rsync(
     label?: string;
   } = {}
 ) {
-  const args = ['-azl', '--human-readable'];
+  const args = ['-az', '--human-readable', '--verbose'];
+  // Use -L to follow symlinks and copy the actual files (not the links)
+  args.push('-L');
+  // Ignore missing/broken symlink targets and continue transfer
+  args.push('--ignore-missing-args');
   if (opts.delete) args.push('--delete');
   if (opts.dryRun) args.push('--dry-run');
   // Enable detailed per-file output
-  args.push('--itemize-changes', '--info=NAME,SKIP,DEL,REMOVE,STATS');
+  args.push('--itemize-changes');
   const includes = opts.includes ?? [];
   const parentIncludes = includes.filter((i) => !i.endsWith('/***'));
-  const recursiveIncluses = includes.filter((i) => i.endsWith('/***'));
+  const recursiveIncludes = includes.filter((i) => i.endsWith('/***'));
+  // CRITICAL: Order matters in rsync filters!
+  // 1. First include parent directories
   for (const inc of parentIncludes) args.push('--include', inc);
+  // 2. Then include recursive patterns (the actual content we want)
+  for (const inc of recursiveIncludes) args.push('--include', inc);
+  // 3. Finally add excludes (to filter out unwanted items)
   for (const exc of opts.excludes ?? []) args.push('--exclude', exc);
-  for (const inc of recursiveIncluses) args.push('--include', inc);
   if (opts.ssh) {
     const sshCmd = opts.ssh.port ? `ssh -p ${opts.ssh.port}` : 'ssh';
     args.push('-e', sshCmd);
@@ -76,10 +84,16 @@ export async function rsync(
   const direction = src.includes('@') ? `${chalk.magenta('remote')} → ${chalk.cyan('local')}` : `${chalk.cyan('local')} → ${chalk.magenta('remote')}`;
   const phaseLabel = opts.label ? chalk.white(opts.label) + ' ' : '';
   console.log(labels.info, phaseLabel + chalk.white('rsync'), chalk.gray(direction));
+  if (includes.length > 0) {
+    logVerbose(chalk.gray('  includes: ') + chalk.gray(includes.join(', ')));
+  }
+  if (opts.excludes && opts.excludes.length > 0) {
+    logVerbose(chalk.gray('  excludes: ') + chalk.gray(opts.excludes.join(', ')));
+  }
   logVerbose(chalk.gray('  ' + args.join(' ')));
 
   // Run rsync with piped output so we can parse and format it
-  const result = await execa('rsync', args, { stdio: 'pipe', all: true });
+  const result = await execa('rsync', args, { stdio: 'pipe', all: true, reject: false });
 
   // Parse and display rsync output in a user-friendly way
   if (result.all) {
@@ -92,6 +106,9 @@ export async function rsync(
     for (const line of lines) {
       // Skip empty lines
       if (!line.trim()) continue;
+
+      // Debug: show all non-empty lines in verbose mode
+      logVerbose(chalk.gray('  [rsync] ') + line);
 
       // Parse itemize output (e.g., "<f+++++++++ path/to/file")
       const itemMatch = line.match(/^([<>ch.*][fdLDS.][c+.][s.][t.][p.][o.][g.][u.][a.][x.]) (.+)$/);
@@ -166,6 +183,19 @@ export async function rsync(
     } else {
       console.log(chalk.gray(`  No changes`));
     }
+  }
+
+  // Check for errors
+  // Exit code 23 = "Partial transfer due to error" - often from broken symlinks
+  // Exit code 24 = "Partial transfer due to vanished source files"
+  // These are warnings, not fatal errors - the transfer mostly succeeded
+  if (result.exitCode !== 0 && result.exitCode !== 23 && result.exitCode !== 24) {
+    throw new Error(`rsync failed with exit code ${result.exitCode}: ${result.stderr || result.stdout}`);
+  }
+
+  // Log warning for partial transfers
+  if (result.exitCode === 23 || result.exitCode === 24) {
+    logWarn(`rsync completed with warnings (exit code ${result.exitCode}): some files could not be transferred (e.g., broken symlinks)`);
   }
 
   return result;

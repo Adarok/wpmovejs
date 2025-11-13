@@ -134,11 +134,33 @@ export function resolvePaths(env: Env) {
 export type MoveConfig = Record<string, Env>;
 
 export async function loadConfig(cwd = process.cwd()): Promise<MoveConfig> {
-  const file = path.resolve(cwd, 'wpmove.yml');
-  const exists = await fs.pathExists(file);
-  if (!exists) {
-    throw new Error(`Config file not found: ${file}`);
+  // Search upward for wpmove.yml, similar to how wordmove searches for Movefile
+  let currentDir = path.resolve(cwd);
+  let file: string | null = null;
+
+  while (true) {
+    const candidate = path.join(currentDir, 'wpmove.yml');
+    if (await fs.pathExists(candidate)) {
+      file = candidate;
+      break;
+    }
+
+    // Check if we've reached the root or a WordPress installation (has wp-config.php)
+    const parent = path.dirname(currentDir);
+    const hasWpConfig = await fs.pathExists(path.join(currentDir, 'wp-config.php'));
+
+    if (parent === currentDir || hasWpConfig) {
+      // Reached filesystem root or WordPress root without finding config
+      break;
+    }
+
+    currentDir = parent;
   }
+
+  if (!file) {
+    throw new Error(`Config file not found: searched upward from ${cwd} for wpmove.yml`);
+  }
+
   const content = await fs.readFile(file, 'utf8');
   const data = parse(content) as unknown;
   const parsed = ConfigSchema.safeParse(data);
