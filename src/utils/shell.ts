@@ -76,14 +76,20 @@ export async function rsync(
   const hidingRules = excludes.filter((e) => e.startsWith('/'));
 
   // CRITICAL: Match wordmove's exact filter order - first matching rule wins!
+  // When we have specific items (recursive includes for specific plugins/themes),
+  // ALL hiding rules must come AFTER the recursive includes, otherwise the
+  // parent hiding rules (like /wp-content/*) will hide the target directory
+  // before we can include the specific items.
+
   // 1. First include parent directories (allows traversal into target paths)
   for (const inc of parentIncludes) args.push('--include', inc);
-  // 2. Then add hiding rules like /wp-content/* and /* (hide non-included siblings)
-  for (const hide of hidingRules) args.push('--exclude', hide);
-  // 3. Then user excludes like .git/, node_modules/ (protect from deletion and transfer)
+  // 2. Then user excludes like .git/, node_modules/ (protect from deletion and transfer)
   for (const exc of userExcludes) args.push('--exclude', exc);
-  // 4. Finally include recursive patterns (the actual content we want)
+  // 3. Then include recursive patterns (the actual content we want)
   for (const inc of recursiveIncludes) args.push('--include', inc);
+  // 4. Finally add ALL hiding rules after recursive includes
+  for (const hide of hidingRules) args.push('--exclude', hide);
+
   if (opts.ssh) {
     const sshCmd = opts.ssh.port ? `ssh -p ${opts.ssh.port}` : 'ssh';
     args.push('-e', sshCmd);
@@ -115,12 +121,11 @@ export async function rsync(
       // Skip empty lines
       if (!line.trim()) continue;
 
-      // Debug: show all non-empty lines in verbose mode
-      logVerbose(chalk.gray('  [rsync] ') + line);
-
       // Parse itemize output (e.g., "<f+++++++++ path/to/file")
       const itemMatch = line.match(/^([<>ch.*][fdLDS.][c+.][s.][t.][p.][o.][g.][u.][a.][x.]) (.+)$/);
       if (itemMatch) {
+        // Debug: show all non-empty lines in verbose mode
+        logVerbose(chalk.gray('  [rsync] ') + line);
         const [, flags, filepath] = itemMatch;
         const flag0 = flags[0]; // < or > or c or h or *
         const flag1 = flags[1]; // f=file, d=dir, L=symlink, etc.
@@ -171,11 +176,17 @@ export async function rsync(
       }
       // Parse stats line (e.g., "sent 1.23M bytes  received 456 bytes")
       else if (line.includes('sent') && line.includes('bytes')) {
+        logVerbose(chalk.gray('  [rsync] ') + line);
         console.log(chalk.gray(`  ${line.trim()}`));
       }
       // Parse total size line
       else if (line.includes('total size')) {
+        logVerbose(chalk.gray('  [rsync] ') + line);
         console.log(chalk.gray(`  ${line.trim()}`));
+      }
+      // Show other lines only in verbose mode
+      else {
+        logVerbose(chalk.gray('  [rsync] ') + line);
       }
     }
 

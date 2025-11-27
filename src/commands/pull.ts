@@ -28,6 +28,7 @@ export default function pull(): Command {
   .option('--mysql', 'use remote mysql/mysqldump instead of wp-cli for DB operations')
   .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
   .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
+  .option('--items <names>', 'comma-separated list of specific plugin or theme names to sync (use with -p/-t)')
     .option('--dry-run', 'show what would be done', false)
     .action(async (opts) => {
       const remoteName = opts.environment;
@@ -40,6 +41,13 @@ export default function pull(): Command {
   const targets = resolveTargets(opts as any);
 
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
+
+      // Parse specific items if provided
+      const specificItems = opts.items ? opts.items.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined;
+      if (specificItems && specificItems.length > 0 && !targets.includes('plugins') && !targets.includes('themes')) {
+        throw new Error('--items requires -p/--plugins or -t/--themes flag');
+      }
+
       let remoteWpAvailable = true;
       if (!isDry) {
         const res = await preflight(local, remote, { targets, operation: 'pull', forceMysql: Boolean(opts.mysql) });
@@ -67,9 +75,17 @@ export default function pull(): Command {
         await rsync(srcRoot, dstRoot, { ...syncOpts, excludes, label: 'WordPress core' });
       }
       if (targets.includes('uploads')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes), label: 'Uploads' });
-      if (targets.includes('plugins')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel), excludes: excludePathsFor(pluginsRel, syncOpts.excludes), label: 'Plugins' });
+      if (targets.includes('plugins')) {
+        const items = specificItems;
+        const label = items ? `Plugins (${items.join(', ')})` : 'Plugins';
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(pluginsRel, items), excludes: excludePathsFor(pluginsRel, syncOpts.excludes, items), label });
+      }
       if (targets.includes('mu-plugins')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(muPluginsRel), excludes: excludePathsFor(muPluginsRel, syncOpts.excludes), label: 'MU-Plugins' });
-      if (targets.includes('themes')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel), excludes: excludePathsFor(themesRel, syncOpts.excludes), label: 'Themes' });
+      if (targets.includes('themes')) {
+        const items = specificItems;
+        const label = items ? `Themes (${items.join(', ')})` : 'Themes';
+        await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(themesRel, items), excludes: excludePathsFor(themesRel, syncOpts.excludes, items), label });
+      }
       if (targets.includes('languages')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(languagesRel), excludes: excludePathsFor(languagesRel, syncOpts.excludes), label: 'Languages' });
 
       // Run DB last to ensure themes/plugins/mu-plugins are present for wp-cli

@@ -56,6 +56,12 @@ wpmovejs push -e production --only db,uploads
 # 6) Pull db + uploads from remote
 wpmovejs pull -e production --only db,uploads
 
+# 7) Push specific plugins only
+wpmovejs push -e production -p --items gdpr-cookie-compliance,contact-form-7
+
+# 8) Pull specific theme only
+wpmovejs pull -e staging -t --items twentytwentyfour
+
 # Tip: preview changes without touching DB/hooks
 wpmovejs push -e production --all --dry-run
 ```
@@ -142,6 +148,9 @@ Global:
 Push/Pull targets:
 - Flags: `-w/--wordpress`, `-u/--uploads`, `-t/--themes`, `-p/--plugins`, `-m/--mu-plugins`, `-l/--languages`, `-d/--db`, `--all`.
 - `--only <targets>`: Comma-separated alternative (e.g., `--only db,uploads`).
+- `--items <names>`: Comma-separated list of specific plugin or theme names to sync (use with `-p`/`-t`).
+  - Example: `wpmovejs push -e staging -p --items akismet,jetpack` (sync only those two plugins)
+  - Example: `wpmovejs pull -e production -t --items twentytwentyfour` (sync only that theme)
 - `--dry-run`: Preview file ops; DB and hooks are skipped entirely.
 
 ## File Sync Behavior
