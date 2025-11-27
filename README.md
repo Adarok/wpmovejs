@@ -6,12 +6,6 @@
 
 TypeScript/Node.js CLI to move/sync WordPress between environments. Inspired by the Ruby tool "wordmove" with a modern, explicit UX.
 
-## What's New in 0.3.0
-
-- Clear colorized output with `[local]` and `[remote]` labels.
-- rsync streams per-file changes; dry-run lists files under targets.
-- DB operations run last to ensure wp-cli sees updated plugins/themes.
-
 ## Requirements
 
 - Node.js 18+

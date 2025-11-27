@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2025-11-27
+- **NEW FEATURE**: Added `--items` option to push/pull specific plugins or themes.
+  - Use with `-p`/`--plugins` or `-t`/`--themes` to sync only named items
+  - Example: `wpmovejs push -e staging -p --items akismet,jetpack`
+  - Example: `wpmovejs pull -e production -t --items twentytwentyfour`
+- **CRITICAL FIX**: Corrected rsync filter ordering for `--items` to ensure specific plugins/themes are actually synced.
+  - Hiding rules now come AFTER recursive includes when using `--items`
+  - This prevents parent hiding rules (like `/wp-content/*`) from excluding target directories
+- Rsync: File operations (ADD, UPD, DEL) now displayed even without `--verbose` flag.
+- Rsync: Raw rsync output only shown in verbose mode for cleaner default output.
+- Tests: Added comprehensive tests for specific item filtering.
+
 ## [0.4.2] - 2025-11-13
 - **CRITICAL FIX**: Rsync filter order now matches wordmove to properly protect excluded files from deletion.
   - Parent includes now come BEFORE hiding rules (`/wp-content/*`, `/*`)
