@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { resolveTargets } from '../src/utils/targets.js';
-import { filterForbiddenTargets, Env } from '../src/config.js';
+import { filterForbiddenTargets, handleForbiddenTargets, Env } from '../src/config.js';
 
 describe('resolveTargets', () => {
   it('uses --only when provided', () => {
@@ -65,5 +65,54 @@ describe('filterForbiddenTargets', () => {
     const result = filterForbiddenTargets(['db', 'uploads'], env, 'push');
     expect(result.allowed).toEqual(['db', 'uploads']);
     expect(result.forbidden).toEqual([]);
+  });
+});
+
+describe('handleForbiddenTargets', () => {
+  it('returns targets when no forbid config', () => {
+    const env: Env = {};
+    const logWarn = vi.fn();
+    const result = handleForbiddenTargets(['db', 'uploads'], env, 'push', 'staging', logWarn);
+    expect(result).toEqual(['db', 'uploads']);
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+
+  it('logs warnings for forbidden targets and returns allowed', () => {
+    const env: Env = {
+      forbid: {
+        push: { db: true },
+      },
+    };
+    const logWarn = vi.fn();
+    const result = handleForbiddenTargets(['db', 'uploads', 'plugins'], env, 'push', 'production', logWarn);
+    expect(result).toEqual(['uploads', 'plugins']);
+    expect(logWarn).toHaveBeenCalledTimes(1);
+    expect(logWarn).toHaveBeenCalledWith("Push of 'db' is forbidden by production environment configuration");
+  });
+
+  it('returns null and logs when all targets are forbidden', () => {
+    const env: Env = {
+      forbid: {
+        pull: { db: true, uploads: true },
+      },
+    };
+    const logWarn = vi.fn();
+    const result = handleForbiddenTargets(['db', 'uploads'], env, 'pull', 'staging', logWarn);
+    expect(result).toBeNull();
+    expect(logWarn).toHaveBeenCalledTimes(3); // 2 individual warnings + 1 "no targets" warning
+    expect(logWarn).toHaveBeenCalledWith("Pull of 'db' is forbidden by staging environment configuration");
+    expect(logWarn).toHaveBeenCalledWith("Pull of 'uploads' is forbidden by staging environment configuration");
+    expect(logWarn).toHaveBeenCalledWith('No targets to pull (all requested targets are forbidden)');
+  });
+
+  it('uses correct operation name in log messages', () => {
+    const env: Env = {
+      forbid: {
+        pull: { themes: true },
+      },
+    };
+    const logWarn = vi.fn();
+    handleForbiddenTargets(['themes'], env, 'pull', 'staging', logWarn);
+    expect(logWarn).toHaveBeenCalledWith("Pull of 'themes' is forbidden by staging environment configuration");
   });
 });

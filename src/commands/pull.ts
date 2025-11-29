@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'fs-extra';
-import { getEnv, loadConfig, resolvePaths, filterForbiddenTargets } from '../config.js';
+import { getEnv, loadConfig, resolvePaths, handleForbiddenTargets } from '../config.js';
 import { rsync, ssh, shQuote } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { wp } from '../services/wpcli.js';
@@ -43,14 +43,8 @@ export default function pull(): Command {
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
 
       // Check for forbidden targets
-      const { allowed: targets, forbidden } = filterForbiddenTargets(requestedTargets, remote, 'pull');
-      if (forbidden.length > 0) {
-        for (const target of forbidden) {
-          logWarn(`Pull of '${target}' is forbidden by ${remoteName} environment configuration`);
-        }
-      }
-      if (targets.length === 0) {
-        logWarn('No targets to pull (all requested targets are forbidden)');
+      const targets = handleForbiddenTargets(requestedTargets, remote, 'pull', remoteName, logWarn);
+      if (targets === null) {
         return;
       }
 

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import type { HooksConfig } from './hooks.js';
+import { Target } from './utils/targets.js';
 
 const DbSchema = z.object({
   host: z.string(),
@@ -163,8 +164,6 @@ export function resolvePaths(env: Env) {
   } as const;
 }
 
-import type { Target } from './utils/targets.js';
-
 /**
  * Filter out forbidden targets and return both the allowed targets and the list of forbidden ones.
  * The forbid configuration allows environments to block specific operations.
@@ -191,6 +190,34 @@ export function filterForbiddenTargets(
   });
 
   return { allowed, forbidden };
+}
+
+/**
+ * Handle forbidden targets by filtering them out and logging warnings.
+ * Returns null if all targets are forbidden (caller should return early).
+ * This is a convenience wrapper around filterForbiddenTargets for use in commands.
+ */
+export function handleForbiddenTargets(
+  requestedTargets: Target[],
+  env: Env,
+  operation: 'push' | 'pull',
+  envName: string,
+  logWarn: (msg: string) => void
+): Target[] | null {
+  const { allowed, forbidden } = filterForbiddenTargets(requestedTargets, env, operation);
+
+  if (forbidden.length > 0) {
+    for (const target of forbidden) {
+      logWarn(`${operation === 'push' ? 'Push' : 'Pull'} of '${target}' is forbidden by ${envName} environment configuration`);
+    }
+  }
+
+  if (allowed.length === 0) {
+    logWarn(`No targets to ${operation} (all requested targets are forbidden)`);
+    return null;
+  }
+
+  return allowed;
 }
 
 export type MoveConfig = Record<string, Env>;

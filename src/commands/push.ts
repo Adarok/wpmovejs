@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
-import { getEnv, loadConfig, resolvePaths, filterForbiddenTargets } from '../config.js';
+import { getEnv, loadConfig, resolvePaths, handleForbiddenTargets } from '../config.js';
 import fs from 'fs-extra';
 import { runHook } from '../hooks.js';
 import { computeUrlPairs } from '../utils/urls.js';
@@ -44,14 +44,8 @@ export default function push(): Command {
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
 
       // Check for forbidden targets
-      const { allowed: targets, forbidden } = filterForbiddenTargets(requestedTargets, remote, 'push');
-      if (forbidden.length > 0) {
-        for (const target of forbidden) {
-          logWarn(`Push of '${target}' is forbidden by ${remoteName} environment configuration`);
-        }
-      }
-      if (targets.length === 0) {
-        logWarn('No targets to push (all requested targets are forbidden)');
+      const targets = handleForbiddenTargets(requestedTargets, remote, 'push', remoteName, logWarn);
+      if (targets === null) {
         return;
       }
 
@@ -171,7 +165,8 @@ export default function push(): Command {
         await runHook(local.hooks?.push?.after);
         await runHook(remote.hooks?.push?.after, { ...remote.ssh, path: remote.ssh.path });
       }
-  logOk('Push completed');
+
+      logOk('Push completed');
     });
   return cmd;
 }
