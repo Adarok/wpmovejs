@@ -40,15 +40,15 @@ jobs:
           echo "SSH_PUBLIC_KEY=$(cat /tmp/wpmovejs-e2e-ssh/id_ed25519.pub)" >> $GITHUB_ENV
 
       - name: Build Docker images
-        run: docker compose -f tests/e2e/docker/docker-compose.yml build
+        run: docker compose -f tests/e2e/docker/docker-compose.yml -p wpmovejs-e2e build
 
       - name: Clean up any existing containers
         run: |
-          docker compose -f tests/e2e/docker/docker-compose.yml down -v --remove-orphans || true
+          docker compose -f tests/e2e/docker/docker-compose.yml -p wpmovejs-e2e down -v --remove-orphans || true
           docker rm -f wpmovejs-e2e-local wpmovejs-e2e-remote 2>/dev/null || true
 
       - name: Start containers
-        run: docker compose -f tests/e2e/docker/docker-compose.yml up -d
+        run: docker compose -f tests/e2e/docker/docker-compose.yml -p wpmovejs-e2e up -d
         env:
           SSH_PUBLIC_KEY: ${{ env.SSH_PUBLIC_KEY }}
 
@@ -83,4 +83,4 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker compose -f tests/e2e/docker/docker-compose.yml down -v
+        run: docker compose -f tests/e2e/docker/docker-compose.yml -p wpmovejs-e2e down -v
