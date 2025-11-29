@@ -1,0 +1,78 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Generate SSH keys
+        run: |
+          mkdir -p /tmp/wpmovejs-e2e-ssh
+          ssh-keygen -t ed25519 -f /tmp/wpmovejs-e2e-ssh/id_ed25519 -N '' -C 'wpmovejs-e2e-test'
+          echo "SSH_PUBLIC_KEY=$(cat /tmp/wpmovejs-e2e-ssh/id_ed25519.pub)" >> $GITHUB_ENV
+
+      - name: Build Docker images
+        run: docker compose -f tests/e2e/docker/docker-compose.yml build
+
+      - name: Start containers
+        run: docker compose -f tests/e2e/docker/docker-compose.yml up -d
+        env:
+          SSH_PUBLIC_KEY: ${{ env.SSH_PUBLIC_KEY }}
+
+      - name: Wait for containers
+        run: |
+          echo "Waiting for containers to be healthy..."
+          timeout 120 bash -c 'until docker inspect --format="{{.State.Health.Status}}" wpmovejs-e2e-local 2>/dev/null | grep -q healthy; do sleep 2; done'
+          timeout 120 bash -c 'until docker inspect --format="{{.State.Health.Status}}" wpmovejs-e2e-remote 2>/dev/null | grep -q healthy; do sleep 2; done'
+          echo "Containers are healthy"
+
+      - name: Wait for WordPress
+        run: |
+          echo "Waiting for WordPress installations..."
+          timeout 60 bash -c 'until docker exec wpmovejs-e2e-local wp core is-installed --allow-root 2>/dev/null; do sleep 2; done'
+          timeout 60 bash -c 'until docker exec wpmovejs-e2e-remote wp core is-installed --allow-root 2>/dev/null; do sleep 2; done'
+          echo "WordPress is ready"
+
+      - name: Setup SSH known_hosts
+        run: |
+          docker exec wpmovejs-e2e-local bash -c 'mkdir -p /root/.ssh && ssh-keyscan -H remote >> /root/.ssh/known_hosts 2>/dev/null'
+
+      - name: Run E2E tests
+        run: npx vitest run --config vitest.e2e.config.ts
+
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          echo "=== Local container logs ==="
+          docker logs wpmovejs-e2e-local
+          echo "=== Remote container logs ==="
+          docker logs wpmovejs-e2e-remote
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f tests/e2e/docker/docker-compose.yml down -v
