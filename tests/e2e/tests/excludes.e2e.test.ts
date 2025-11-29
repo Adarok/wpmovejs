@@ -18,7 +18,6 @@ import {
   deleteTheme,
   createThemeFile,
   themeFileExists,
-  themeDirExists,
 } from '../helpers/setup.js';
 
 describe('Exclude Patterns', () => {
