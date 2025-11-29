@@ -198,7 +198,9 @@ export async function createUploadFile(container: 'local' | 'remote', relativePa
   const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
   await exec(`mkdir -p ${dir}`);
-  await exec(`echo '${content}' > ${fullPath}`);
+  await exec(`cat > ${fullPath} << 'CONTENT_EOF'
+${content}
+CONTENT_EOF`);
 }
 
 /**
@@ -236,7 +238,9 @@ export async function createPluginFile(container: 'local' | 'remote', pluginName
   const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
   await exec(`mkdir -p ${dir}`);
-  await exec(`echo '${content}' > ${fullPath}`);
+  await exec(`cat > ${fullPath} << 'CONTENT_EOF'
+${content}
+CONTENT_EOF`);
 }
 
 /**
@@ -276,7 +280,9 @@ export async function createThemeFile(container: 'local' | 'remote', themeName: 
   const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
   await exec(`mkdir -p ${dir}`);
-  await exec(`echo '${content}' > ${fullPath}`);
+  await exec(`cat > ${fullPath} << 'CONTENT_EOF'
+${content}
+CONTENT_EOF`);
 }
 
 /**
