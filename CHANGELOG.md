@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2025-11-29
+- Release: Publish v0.6.0 changes to npm.
+
+## [0.6.0] - 2025-11-29
+- **NEW FEATURE**: Added `forbid` option to prevent dangerous operations on specific environments.
+  - Configure `forbid: [push]` or `forbid: [pull]` per environment in `wpmove.yml`
+  - Prevents accidental overwrites of production data
+  - Example: Forbid pushing to production while allowing pulls
+- Fixes #20.
+
+## [0.5.1] - 2025-11-27
+- Release: Documentation updates and v0.5.0 release cleanup.
+
 ## [0.5.0] - 2025-11-27
 - **NEW FEATURE**: Added `--items` option to push/pull specific plugins or themes.
   - Use with `-p`/`--plugins` or `-t`/`--themes` to sync only named items

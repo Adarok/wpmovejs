@@ -21,7 +21,8 @@
     "clean": "rm -rf dist",
     "start": "node dist/cli.js --help",
     "prepublishOnly": "npm run build",
-    "release": "npm run test && npm run build && git add -A && git commit -m \"Release v$npm_package_version\" && git tag v$npm_package_version && git push origin main --tags"
+    "prerelease": "npm run test && npm run build",
+    "release": "node -e \"const v = require('./package.json').version; const c = require('fs').readFileSync('CHANGELOG.md','utf8'); if (!c.includes('['+v+']')) { console.error('ERROR: CHANGELOG.md missing entry for version '+v); process.exit(1); }\" && git add -A && git diff --cached --quiet || git commit -m \"v$(node -p \"require('./package.json').version\")\" && git tag -f \"v$(node -p \"require('./package.json').version\")\" && git push && git push --tags"
   },
   "engines": {
     "node": ">=18"
