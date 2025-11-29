@@ -42,6 +42,11 @@ jobs:
       - name: Build Docker images
         run: docker compose -f tests/e2e/docker/docker-compose.yml build
 
+      - name: Clean up any existing containers
+        run: |
+          docker compose -f tests/e2e/docker/docker-compose.yml down -v --remove-orphans || true
+          docker rm -f wpmovejs-e2e-local wpmovejs-e2e-remote 2>/dev/null || true
+
       - name: Start containers
         run: docker compose -f tests/e2e/docker/docker-compose.yml up -d
         env:
