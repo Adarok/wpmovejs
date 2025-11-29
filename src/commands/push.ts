@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
-import { getEnv, loadConfig, resolvePaths } from '../config.js';
+import { getEnv, loadConfig, resolvePaths, handleForbiddenTargets } from '../config.js';
 import fs from 'fs-extra';
 import { runHook } from '../hooks.js';
 import { computeUrlPairs } from '../utils/urls.js';
@@ -11,7 +11,7 @@ import { resolveTargets } from '../utils/targets.js';
 import { wp } from '../services/wpcli.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
 import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
-import { logDry, logInfo, logOk } from '../state.js';
+import { logDry, logInfo, logOk, logWarn } from '../state.js';
 import { preflight } from '../preflight.js';
 
 export default function push(): Command {
@@ -40,8 +40,14 @@ export default function push(): Command {
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
 
-      const targets = resolveTargets(opts as any);
+      const requestedTargets = resolveTargets(opts as any);
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
+
+      // Check for forbidden targets
+      const targets = handleForbiddenTargets(requestedTargets, remote, 'push', remoteName, logWarn);
+      if (targets === null) {
+        return;
+      }
 
       // Parse specific items if provided
       const specificItems = opts.items ? opts.items.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined;
@@ -159,7 +165,8 @@ export default function push(): Command {
         await runHook(local.hooks?.push?.after);
         await runHook(remote.hooks?.push?.after, { ...remote.ssh, path: remote.ssh.path });
       }
-  logOk('Push completed');
+
+      logOk('Push completed');
     });
   return cmd;
 }

@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'fs-extra';
-import { getEnv, loadConfig, resolvePaths } from '../config.js';
+import { getEnv, loadConfig, resolvePaths, handleForbiddenTargets } from '../config.js';
 import { rsync, ssh, shQuote } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { wp } from '../services/wpcli.js';
@@ -38,9 +38,15 @@ export default function pull(): Command {
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
 
-  const targets = resolveTargets(opts as any);
+      const requestedTargets = resolveTargets(opts as any);
 
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
+
+      // Check for forbidden targets
+      const targets = handleForbiddenTargets(requestedTargets, remote, 'pull', remoteName, logWarn);
+      if (targets === null) {
+        return;
+      }
 
       // Parse specific items if provided
       const specificItems = opts.items ? opts.items.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined;

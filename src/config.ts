@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 import type { HooksConfig } from './hooks.js';
+import { Target } from './utils/targets.js';
 
 const DbSchema = z.object({
   host: z.string(),
@@ -20,6 +21,21 @@ const SshSchema = z.object({
     message: 'ssh.path must be an absolute path starting with /',
   }),
 });
+
+const ForbidTargetsSchema = z.object({
+  db: z.boolean().optional(),
+  wordpress: z.boolean().optional(),
+  plugins: z.boolean().optional(),
+  themes: z.boolean().optional(),
+  uploads: z.boolean().optional(),
+  mu_plugins: z.boolean().optional(),
+  languages: z.boolean().optional(),
+}).optional();
+
+const ForbidSchema = z.object({
+  push: ForbidTargetsSchema,
+  pull: ForbidTargetsSchema,
+}).partial().optional();
 
 const EnvSchema = z.object({
   wordpress_path: z.string().refine((p: string) => p.startsWith('/'), {
@@ -45,6 +61,7 @@ const EnvSchema = z.object({
     })
     .partial()
     .optional(),
+  forbid: ForbidSchema,
   paths: z
     .object({
       wp_content: z
@@ -97,6 +114,21 @@ export interface Ssh {
   path: string;
 }
 
+export interface ForbidTargets {
+  db?: boolean;
+  wordpress?: boolean;
+  plugins?: boolean;
+  themes?: boolean;
+  uploads?: boolean;
+  mu_plugins?: boolean;
+  languages?: boolean;
+}
+
+export interface Forbid {
+  push?: ForbidTargets;
+  pull?: ForbidTargets;
+}
+
 export interface Env {
   wordpress_path?: string;
   wp_cli?: string;
@@ -105,6 +137,7 @@ export interface Env {
   urls?: string[];
   exclude?: string[];
   hooks?: HooksConfig;
+  forbid?: Forbid;
   sync?: { excludes?: string[]; includes?: string[]; delete?: boolean };
   paths?: {
     wp_content?: string;
@@ -129,6 +162,62 @@ export function resolvePaths(env: Env) {
     uploads: p.uploads ?? `${wp_content}/uploads`,
     languages: p.languages ?? `${wp_content}/languages`,
   } as const;
+}
+
+/**
+ * Filter out forbidden targets and return both the allowed targets and the list of forbidden ones.
+ * The forbid configuration allows environments to block specific operations.
+ */
+export function filterForbiddenTargets(
+  targets: Target[],
+  env: Env,
+  operation: 'push' | 'pull'
+): { allowed: Target[]; forbidden: Target[] } {
+  const forbidConfig = env.forbid?.[operation];
+  if (!forbidConfig) {
+    return { allowed: targets, forbidden: [] };
+  }
+
+  const forbidden: Target[] = [];
+  const allowed = targets.filter((target) => {
+    // Map target name to forbid config key (mu-plugins -> mu_plugins)
+    const configKey = target.replaceAll('-', '_') as keyof ForbidTargets;
+    if (forbidConfig[configKey] === true) {
+      forbidden.push(target);
+      return false;
+    }
+    return true;
+  });
+
+  return { allowed, forbidden };
+}
+
+/**
+ * Handle forbidden targets by filtering them out and logging warnings.
+ * Returns null if all targets are forbidden (caller should return early).
+ * This is a convenience wrapper around filterForbiddenTargets for use in commands.
+ */
+export function handleForbiddenTargets(
+  requestedTargets: Target[],
+  env: Env,
+  operation: 'push' | 'pull',
+  envName: string,
+  logWarn: (msg: string) => void
+): Target[] | null {
+  const { allowed, forbidden } = filterForbiddenTargets(requestedTargets, env, operation);
+
+  if (forbidden.length > 0) {
+    for (const target of forbidden) {
+      logWarn(`${operation === 'push' ? 'Push' : 'Pull'} of '${target}' is forbidden by ${envName} environment configuration`);
+    }
+  }
+
+  if (allowed.length === 0) {
+    logWarn(`No targets to ${operation} (all requested targets are forbidden)`);
+    return null;
+  }
+
+  return allowed;
 }
 
 export type MoveConfig = Record<string, Env>;

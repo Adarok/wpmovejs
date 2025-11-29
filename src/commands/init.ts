@@ -133,6 +133,25 @@ production:
       after:
         local: []
         remote: []
+  # Forbid specific operations on this environment (safety measure for production)
+  # Set to true to prevent accidental push/pull of specific targets
+  forbid:
+    push:
+      db: false        # Set to true to prevent pushing database to this environment
+      # wordpress: false
+      # plugins: false
+      # themes: false
+      # uploads: false
+      # mu_plugins: false
+      # languages: false
+    pull:
+      db: false        # Set to true to prevent pulling database from this environment
+      # wordpress: false
+      # plugins: false
+      # themes: false
+      # uploads: false
+      # mu_plugins: false
+      # languages: false
 `;
 
       await fs.writeFile(file, template, 'utf8');

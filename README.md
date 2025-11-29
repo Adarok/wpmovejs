@@ -73,6 +73,7 @@ Run `wpmovejs init` to generate a full, commented template. Key fields:
 - `sync`: rsync tuning (`excludes`, `includes`, `delete`).
 - `paths`: Override common paths if your layout is non-standard.
 - `hooks`: Pre/post commands for `push` and `pull` (local/remote).
+- `forbid`: Block specific push/pull operations per environment (safety measure).
 
 Example (trimmed):
 
@@ -146,6 +147,27 @@ Push/Pull targets:
   - Example: `wpmovejs push -e staging -p --items akismet,jetpack` (sync only those two plugins)
   - Example: `wpmovejs pull -e production -t --items twentytwentyfour` (sync only that theme)
 - `--dry-run`: Preview file ops; DB and hooks are skipped entirely.
+
+## Forbid Configuration
+
+The `forbid` option allows you to block specific push/pull operations per environment. This is a safety measure to prevent accidental overwrites, especially useful for production environments.
+
+```yaml
+production:
+  forbid:
+    push:
+      db: true         # Prevent pushing database to production
+      uploads: true    # Prevent pushing uploads to production
+    pull:
+      db: false        # Allow pulling database from production
+```
+
+Available targets: `db`, `wordpress`, `plugins`, `themes`, `uploads`, `mu_plugins`, `languages`.
+
+When a forbidden operation is attempted, wpmovejs will display a warning and skip that target:
+```
+[warn] Push of 'db' is forbidden by production environment configuration
+```
 
 ## File Sync Behavior
 
