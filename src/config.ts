@@ -29,7 +29,7 @@ const ForbidTargetsSchema = z.object({
   uploads: z.boolean().optional(),
   mu_plugins: z.boolean().optional(),
   languages: z.boolean().optional(),
-}).partial().optional();
+}).optional();
 
 const ForbidSchema = z.object({
   push: ForbidTargetsSchema,
@@ -182,7 +182,7 @@ export function filterForbiddenTargets(
   const forbidden: Target[] = [];
   const allowed = targets.filter((target) => {
     // Map target name to forbid config key (mu-plugins -> mu_plugins)
-    const configKey = target.replace('-', '_') as keyof ForbidTargets;
+    const configKey = target.replaceAll('-', '_') as keyof ForbidTargets;
     if (forbidConfig[configKey] === true) {
       forbidden.push(target);
       return false;

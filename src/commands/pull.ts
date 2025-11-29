@@ -38,7 +38,7 @@ export default function pull(): Command {
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
 
-  const requestedTargets = resolveTargets(opts as any);
+      const requestedTargets = resolveTargets(opts as any);
 
       const isDry = Boolean(opts.dry_run ?? opts.dryRun);
 
