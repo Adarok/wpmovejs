@@ -1,2 +1,5 @@
 node_modules
 dist
+
+# E2E test SSH keys (generated at runtime)
+/tmp/wpmovejs-e2e-ssh/

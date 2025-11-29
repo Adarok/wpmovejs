@@ -1,0 +1,67 @@
+services:
+  # "Local" WordPress - where wpmovejs runs from
+  local:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wpmovejs-e2e-local
+    environment:
+      - SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
+      - WP_PORT=8080
+    ports:
+      - "8080:80"
+    volumes:
+      # Mount wpmovejs dist for testing
+      - ../../../dist:/opt/wpmovejs/dist:ro
+      - ../../../package.json:/opt/wpmovejs/package.json:ro
+      # Mount node_modules for dependencies
+      - ../../../node_modules:/opt/wpmovejs/node_modules:ro
+      # Mount test fixtures
+      - ../fixtures:/opt/fixtures:ro
+      # SSH keys (mounted by globalSetup via SSH_KEY_DIR env var)
+      - ${SSH_KEY_DIR:-/tmp/wpmovejs-e2e-ssh}:/opt/ssh:ro
+      # Persistent WordPress data for local
+      - local-wp:/var/www/html
+    networks:
+      - wpmovejs-e2e
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || curl -f http://localhost/wp-admin/install.php"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    command: ["daemon"]
+
+  # "Remote" WordPress - the target for push/pull operations
+  remote:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wpmovejs-e2e-remote
+    hostname: remote
+    environment:
+      - SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
+      - WP_PORT=8081
+    ports:
+      - "8081:80"
+      - "2222:22"
+    volumes:
+      # Persistent WordPress data for remote
+      - remote-wp:/var/www/html
+    networks:
+      - wpmovejs-e2e
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || curl -f http://localhost/wp-admin/install.php"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    command: ["daemon"]
+
+volumes:
+  local-wp:
+  remote-wp:
+
+networks:
+  wpmovejs-e2e:
+    driver: bridge

@@ -1,0 +1,27 @@
+local:
+  wordpress_path: /var/www/html
+  db:
+    host: localhost
+    name: wordpress
+    user: wordpress
+    password: wordpress
+  urls:
+    - http://localhost:8080
+
+remote:
+  wordpress_path: /var/www/html
+  ssh:
+    host: remote
+    user: www-data
+    port: 22
+    path: /var/www/html
+  db:
+    host: localhost
+    name: wordpress
+    user: wordpress
+    password: wordpress
+  urls:
+    - http://localhost:8081
+  exclude:
+    - .git
+    - node_modules

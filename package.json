@@ -13,12 +13,16 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts",
+    "test:e2e:setup": "docker compose -f tests/e2e/docker/docker-compose.yml up -d --build",
+    "test:e2e:teardown": "docker compose -f tests/e2e/docker/docker-compose.yml down -v",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "clean": "rm -rf dist",
     "start": "node dist/cli.js --help",
     "prepublishOnly": "npm run build",
-    "release": "npm run test && npm run build && git add -A && git commit -m \"Release v$npm_package_version\" && git tag v$npm_package_version && git push origin main --tags"
+    "prerelease": "npm run test && npm run build",
+    "release": "node -e \"const v = require('./package.json').version; const c = require('fs').readFileSync('CHANGELOG.md','utf8'); if (!c.includes('['+v+']')) { console.error('ERROR: CHANGELOG.md missing entry for version '+v); process.exit(1); }\" && git add -A && git diff --cached --quiet || git commit -m \"v$(node -p \"require('./package.json').version\")\" && git tag -f \"v$(node -p \"require('./package.json').version\")\" && git push && git push --tags"
   },
   "engines": {
     "node": ">=18"
