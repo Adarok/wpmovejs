@@ -163,21 +163,23 @@ export function resolvePaths(env: Env) {
   } as const;
 }
 
+import type { Target } from './utils/targets.js';
+
 /**
  * Filter out forbidden targets and return both the allowed targets and the list of forbidden ones.
  * The forbid configuration allows environments to block specific operations.
  */
 export function filterForbiddenTargets(
-  targets: string[],
+  targets: Target[],
   env: Env,
   operation: 'push' | 'pull'
-): { allowed: string[]; forbidden: string[] } {
+): { allowed: Target[]; forbidden: Target[] } {
   const forbidConfig = env.forbid?.[operation];
   if (!forbidConfig) {
     return { allowed: targets, forbidden: [] };
   }
 
-  const forbidden: string[] = [];
+  const forbidden: Target[] = [];
   const allowed = targets.filter((target) => {
     // Map target name to forbid config key (mu-plugins -> mu_plugins)
     const configKey = target.replace('-', '_') as keyof ForbidTargets;
