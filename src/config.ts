@@ -21,6 +21,21 @@ const SshSchema = z.object({
   }),
 });
 
+const ForbidTargetsSchema = z.object({
+  db: z.boolean().optional(),
+  wordpress: z.boolean().optional(),
+  plugins: z.boolean().optional(),
+  themes: z.boolean().optional(),
+  uploads: z.boolean().optional(),
+  mu_plugins: z.boolean().optional(),
+  languages: z.boolean().optional(),
+}).partial().optional();
+
+const ForbidSchema = z.object({
+  push: ForbidTargetsSchema,
+  pull: ForbidTargetsSchema,
+}).partial().optional();
+
 const EnvSchema = z.object({
   wordpress_path: z.string().refine((p: string) => p.startsWith('/'), {
     message: 'wordpress_path must be an absolute path starting with /',
@@ -45,6 +60,7 @@ const EnvSchema = z.object({
     })
     .partial()
     .optional(),
+  forbid: ForbidSchema,
   paths: z
     .object({
       wp_content: z
@@ -97,6 +113,21 @@ export interface Ssh {
   path: string;
 }
 
+export interface ForbidTargets {
+  db?: boolean;
+  wordpress?: boolean;
+  plugins?: boolean;
+  themes?: boolean;
+  uploads?: boolean;
+  mu_plugins?: boolean;
+  languages?: boolean;
+}
+
+export interface Forbid {
+  push?: ForbidTargets;
+  pull?: ForbidTargets;
+}
+
 export interface Env {
   wordpress_path?: string;
   wp_cli?: string;
@@ -105,6 +136,7 @@ export interface Env {
   urls?: string[];
   exclude?: string[];
   hooks?: HooksConfig;
+  forbid?: Forbid;
   sync?: { excludes?: string[]; includes?: string[]; delete?: boolean };
   paths?: {
     wp_content?: string;
@@ -129,6 +161,34 @@ export function resolvePaths(env: Env) {
     uploads: p.uploads ?? `${wp_content}/uploads`,
     languages: p.languages ?? `${wp_content}/languages`,
   } as const;
+}
+
+/**
+ * Filter out forbidden targets and return both the allowed targets and the list of forbidden ones.
+ * The forbid configuration allows environments to block specific operations.
+ */
+export function filterForbiddenTargets(
+  targets: string[],
+  env: Env,
+  operation: 'push' | 'pull'
+): { allowed: string[]; forbidden: string[] } {
+  const forbidConfig = env.forbid?.[operation];
+  if (!forbidConfig) {
+    return { allowed: targets, forbidden: [] };
+  }
+
+  const forbidden: string[] = [];
+  const allowed = targets.filter((target) => {
+    // Map target name to forbid config key (mu-plugins -> mu_plugins)
+    const configKey = target.replace('-', '_') as keyof ForbidTargets;
+    if (forbidConfig[configKey] === true) {
+      forbidden.push(target);
+      return false;
+    }
+    return true;
+  });
+
+  return { allowed, forbidden };
 }
 
 export type MoveConfig = Record<string, Env>;
