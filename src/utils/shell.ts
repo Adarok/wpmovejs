@@ -57,15 +57,16 @@ export async function rsync(
     label?: string;
   } = {}
 ) {
-  const args = ['-az', '--human-readable', '--verbose'];
+  const args = ['-az', '--human-readable'];
   // Use -L to follow symlinks and copy the actual files (not the links)
   args.push('-L');
   // Ignore missing/broken symlink targets and continue transfer
   args.push('--ignore-missing-args');
   if (opts.delete) args.push('--delete');
   if (opts.dryRun) args.push('--dry-run');
-  // Enable detailed per-file output
+  // Enable detailed per-file output and progress
   args.push('--itemize-changes');
+  args.push('--progress');
   const includes = opts.includes ?? [];
   const excludes = opts.excludes ?? [];
   const parentIncludes = includes.filter((i) => !i.endsWith('/***'));
@@ -106,102 +107,131 @@ export async function rsync(
   }
   logVerbose(chalk.gray('  ' + args.join(' ')));
 
-  // Run rsync with piped output so we can parse and format it
-  const result = await execa('rsync', args, { stdio: 'pipe', all: true, reject: false });
+  // Run rsync with piped output so we can parse and format it in real-time
+  const proc = execa('rsync', args, { stdio: 'pipe', all: true, reject: false });
 
-  // Parse and display rsync output in a user-friendly way
-  if (result.all) {
-    const lines = result.all.split('\n');
-    let addedFiles = 0;
-    let updatedFiles = 0;
-    let deletedFiles = 0;
-    let addedDirs = 0;
+  let addedFiles = 0;
+  let updatedFiles = 0;
+  let deletedFiles = 0;
+  let addedDirs = 0;
 
-    for (const line of lines) {
-      // Skip empty lines
-      if (!line.trim()) continue;
+  // Create a promise to track when stream processing is complete
+  const streamDone = new Promise<void>((resolve) => {
+    if (!proc.all) {
+      resolve();
+      return;
+    }
 
-      // Parse itemize output (e.g., "<f+++++++++ path/to/file")
-      const itemMatch = line.match(/^([<>ch.*][fdLDS.][c+.][s.][t.][p.][o.][g.][u.][a.][x.]) (.+)$/);
-      if (itemMatch) {
-        // Debug: show all non-empty lines in verbose mode
-        logVerbose(chalk.gray('  [rsync] ') + line);
-        const [, flags, filepath] = itemMatch;
-        const flag0 = flags[0]; // < or > or c or h or *
-        const flag1 = flags[1]; // f=file, d=dir, L=symlink, etc.
-        const flag2 = flags[2]; // c=checksum differs, +=new
+    let buffer = '';
+    proc.all.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      // Keep the last incomplete line in the buffer
+      buffer = lines.pop() ?? '';
 
-        // Determine action
-        let action = '';
-        let color = chalk.white;
-        let shouldCount = true;
+      for (const line of lines) {
+        // Skip empty lines
+        if (!line.trim()) continue;
 
-        if (flag0 === '*') {
-          // Deletion
-          action = 'DEL';
-          color = chalk.red;
-          deletedFiles++;
-        } else if (flag2 === '+') {
-          // New file or directory
-          if (flag1 === 'f' || flag1 === 'L') {
-            action = 'ADD';
-            color = chalk.green;
-            addedFiles++;
-          } else if (flag1 === 'd') {
-            action = 'DIR';
-            color = chalk.blue;
-            addedDirs++;
-          }
-        } else if (flag2 === 'c' || flags.includes('s')) {
-          // Modified (checksum or size changed)
-          action = 'UPD';
-          color = chalk.yellow;
-          updatedFiles++;
-        } else if (flag1 === 'd' && flag2 === '.') {
-          // Directory timestamp/permissions only - skip
-          shouldCount = false;
-        } else if (flags.substring(2).includes('t') || flags.substring(2).includes('p')) {
-          // Only timestamp or permissions changed
-          action = 'CHG';
-          color = chalk.gray;
-          shouldCount = false;
-        } else {
-          // Other changes
-          shouldCount = false;
+        // Parse per-file progress output (e.g., "  1,234,567 100%   12.34MB/s    0:00:01")
+        // This comes after each file with --progress flag
+        const progressMatch = line.match(/^\s*[\d,]+\s+\d+%\s+[\d.]+[KMGT]?B\/s/);
+        if (progressMatch) {
+          // Show terse progress - just the line as-is
+          console.log(chalk.gray(`  ${line.trim()}`));
+          continue;
         }
 
-        if (shouldCount || action) {
+        // Parse itemize output (e.g., ">f..t....... path/to/file" or "<f+++++++++ path/to/file")
+        // Format: YXcstpoguax (11 chars) or YXcstpoguax. (12 chars with ACL field)
+        const itemMatch = line.match(/^([<>ch.*][fdLDS.][^\s]{9,10}) (.+)$/);
+        if (itemMatch) {
+          logVerbose(chalk.gray('  [rsync] ') + line);
+          const [, flags, filepath] = itemMatch;
+          const flag0 = flags[0]; // < or > or c or h or *
+          const flag1 = flags[1]; // f=file, d=dir, L=symlink, etc.
+          const flag2 = flags[2]; // c=checksum differs, +=new
+
+          // Determine action and display
+          let action = '';
+          let color = chalk.white;
+
+          if (flag0 === '*') {
+            // Deletion
+            action = 'DEL';
+            color = chalk.red;
+            deletedFiles++;
+          } else if (flag2 === '+') {
+            // New file or directory
+            if (flag1 === 'f' || flag1 === 'L') {
+              action = 'ADD';
+              color = chalk.green;
+              addedFiles++;
+            } else if (flag1 === 'd') {
+              action = 'DIR';
+              color = chalk.blue;
+              addedDirs++;
+            }
+          } else if (flag2 === 'c' || flags.substring(2).includes('s')) {
+            // Modified (checksum or size changed)
+            action = 'UPD';
+            color = chalk.yellow;
+            updatedFiles++;
+          } else if (flag1 === 'd' && flag2 === '.') {
+            // Directory timestamp/permissions only - skip display
+            continue;
+          } else if (flags.substring(2).includes('t') || flags.substring(2).includes('p')) {
+            // Timestamp or permissions changed
+            action = 'UPD';
+            color = chalk.yellow;
+            updatedFiles++;
+          } else {
+            // Other minor changes - skip display
+            continue;
+          }
+
           console.log(`  ${color(action.padEnd(3))} ${chalk.gray(filepath)}`);
         }
+        // Parse stats line (e.g., "sent 1.23M bytes  received 456 bytes")
+        else if (line.includes('sent') && line.includes('bytes')) {
+          logVerbose(chalk.gray('  [rsync] ') + line);
+          console.log(chalk.gray(`  ${line.trim()}`));
+        }
+        // Parse total size line
+        else if (line.includes('total size')) {
+          logVerbose(chalk.gray('  [rsync] ') + line);
+          console.log(chalk.gray(`  ${line.trim()}`));
+        }
+        // Show other lines only in verbose mode
+        else {
+          logVerbose(chalk.gray('  [rsync] ') + line);
+        }
       }
-      // Parse stats line (e.g., "sent 1.23M bytes  received 456 bytes")
-      else if (line.includes('sent') && line.includes('bytes')) {
-        logVerbose(chalk.gray('  [rsync] ') + line);
-        console.log(chalk.gray(`  ${line.trim()}`));
-      }
-      // Parse total size line
-      else if (line.includes('total size')) {
-        logVerbose(chalk.gray('  [rsync] ') + line);
-        console.log(chalk.gray(`  ${line.trim()}`));
-      }
-      // Show other lines only in verbose mode
-      else {
-        logVerbose(chalk.gray('  [rsync] ') + line);
-      }
-    }
+    });
 
-    // Show summary if anything was transferred
-    const totalChanges = addedFiles + updatedFiles + deletedFiles;
-    if (totalChanges > 0 || addedDirs > 0) {
-      const parts = [];
-      if (addedFiles > 0) parts.push(chalk.green(`${addedFiles} added`));
-      if (updatedFiles > 0) parts.push(chalk.yellow(`${updatedFiles} updated`));
-      if (deletedFiles > 0) parts.push(chalk.red(`${deletedFiles} deleted`));
-      if (addedDirs > 0) parts.push(chalk.blue(`${addedDirs} dirs`));
-      console.log(chalk.gray(`  Summary: `) + parts.join(chalk.gray(', ')));
-    } else {
-      console.log(chalk.gray(`  No changes`));
-    }
+    proc.all.on('end', () => {
+      // Process any remaining data in buffer
+      if (buffer.trim()) {
+        logVerbose(chalk.gray('  [rsync] ') + buffer);
+      }
+      resolve();
+    });
+  });
+
+  const result = await proc;
+  await streamDone;
+
+  // Show summary if anything was transferred
+  const totalChanges = addedFiles + updatedFiles + deletedFiles;
+  if (totalChanges > 0 || addedDirs > 0) {
+    const parts = [];
+    if (addedFiles > 0) parts.push(chalk.green(`${addedFiles} added`));
+    if (updatedFiles > 0) parts.push(chalk.yellow(`${updatedFiles} updated`));
+    if (deletedFiles > 0) parts.push(chalk.red(`${deletedFiles} deleted`));
+    if (addedDirs > 0) parts.push(chalk.blue(`${addedDirs} dirs`));
+    console.log(chalk.gray(`  Summary: `) + parts.join(chalk.gray(', ')));
+  } else {
+    console.log(chalk.gray(`  No changes`));
   }
 
   // Check for errors
