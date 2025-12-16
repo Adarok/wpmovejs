@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2024-12-16
+- **IMPROVEMENT**: Rsync progress output now displayed in real-time without requiring `--verbose` flag.
+  - File changes (ADD, UPD, DEL, DIR) shown as they happen during transfer
+  - Per-file transfer progress (bytes, percentage, speed) displayed in real-time
+  - Transfer stats and summary shown at completion
+- **FIX**: Fixed rsync itemize parsing to handle both 11 and 12 character formats (ACL field support).
+- **FIX**: Timestamp-only file updates now correctly counted and displayed in summary.
+
 ## [0.6.1] - 2025-11-29
 - Release: Publish v0.6.0 changes to npm.
 
