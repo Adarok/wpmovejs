@@ -2,8 +2,8 @@ import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'fs-extra';
-import { getEnv, loadConfig, resolvePaths, handleForbiddenTargets } from '../config.js';
-import { rsync, ssh, shQuote } from '../utils/shell.js';
+import { getEnv, loadConfigWithPath, checkConfigPermissions, resolvePaths, handleForbiddenTargets } from '../config.js';
+import { rsync, ssh, shQuote, generateSecureTempName } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { wp } from '../services/wpcli.js';
 import { runHook } from '../hooks.js';
@@ -33,7 +33,10 @@ export default function pull(): Command {
     .action(async (opts) => {
       const remoteName = opts.environment;
       if (!remoteName) throw new Error('Missing --environment/-e. Example: wpmovejs pull -e staging --only db,uploads');
-      const cfg = await loadConfig();
+      const { config: cfg, filePath: configPath } = await loadConfigWithPath();
+      // Security: warn if config file has insecure permissions
+      const permWarning = await checkConfigPermissions(configPath);
+      if (permWarning) logWarn(permWarning);
       const local = getEnv(cfg, 'local');
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
@@ -101,19 +104,22 @@ export default function pull(): Command {
         } else {
         logInfo('Database pull: export remote → import local and search-replace');
         const remoteDir = remote.ssh.path;
-        const tmpRemote = `${remoteDir}/wpmovejs-${Date.now()}.sql`;
-        const tmpLocal = path.join(os.tmpdir(), path.basename(tmpRemote));
+        const tmpName = generateSecureTempName();
+        const tmpRemote = `${remoteDir}/${tmpName}`;
+        const tmpLocal = path.join(os.tmpdir(), tmpName);
 
         try {
           if (opts.mysql || !remoteWpAvailable) {
             // Fallback: remote dump using mysqldump with credentials
+            // SECURITY: Use MYSQL_PWD env var instead of -p flag to avoid password exposure in process list
             const db = remote.db!;
             const creds = [
               `-h${db.host}`,
               `-u${db.user}`,
-              db.password ? `-p${db.password}` : '',
               db.name,
-            ].filter(Boolean).join(' ');
+            ].join(' ');
+            // Set MYSQL_PWD in the remote shell environment (not visible in ps output)
+            const pwdPrefix = db.password ? `MYSQL_PWD=${shQuote(db.password)} ` : '';
 
             // Try with --set-gtid-purged=OFF first (supported in MySQL 5.6+/MariaDB 10.0+)
             // Fall back without it if the flag is not recognized
@@ -121,7 +127,7 @@ export default function pull(): Command {
               await ssh(
                 remote.ssh.user,
                 remote.ssh.host,
-                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
+                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(tmpRemote)}`)}`,
                 remote.ssh.port,
                 { stdio: 'pipe' }
               );
@@ -132,7 +138,7 @@ export default function pull(): Command {
                 await ssh(
                   remote.ssh.user,
                   remote.ssh.host,
-                  `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && mysqldump ${creds} --single-transaction > ${shQuote(tmpRemote)}`)}`,
+                  `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction > ${shQuote(tmpRemote)}`)}`,
                   remote.ssh.port,
                   { stdio: 'pipe' }
                 );

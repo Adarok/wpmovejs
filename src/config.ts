@@ -222,6 +222,28 @@ export function handleForbiddenTargets(
 
 export type MoveConfig = Record<string, Env>;
 
+/**
+ * Check if config file has secure permissions (not world-readable).
+ * Returns a warning message if permissions are too open, null otherwise.
+ */
+export async function checkConfigPermissions(filePath: string): Promise<string | null> {
+  try {
+    const stats = await fs.stat(filePath);
+    const mode = stats.mode;
+    // Check if file is readable by group (0o040) or others (0o004)
+    const groupReadable = (mode & 0o040) !== 0;
+    const otherReadable = (mode & 0o004) !== 0;
+    if (groupReadable || otherReadable) {
+      const perms = (mode & 0o777).toString(8).padStart(3, '0');
+      return `Config file ${filePath} has insecure permissions (${perms}). Contains database credentials - recommend chmod 600.`;
+    }
+    return null;
+  } catch {
+    // If we can't check permissions, don't warn (might be on Windows etc.)
+    return null;
+  }
+}
+
 export async function loadConfig(cwd = process.cwd()): Promise<MoveConfig> {
   // Search upward for wpmove.yml, similar to how wordmove searches for Movefile
   let currentDir = path.resolve(cwd);
@@ -258,6 +280,48 @@ export async function loadConfig(cwd = process.cwd()): Promise<MoveConfig> {
     throw new Error(`Invalid wpmove.yml\n${issues}`);
   }
   return parsed.data;
+}
+
+/**
+ * Load config and return both the config and the file path.
+ * Useful when the caller needs to check file permissions.
+ */
+export async function loadConfigWithPath(cwd = process.cwd()): Promise<{ config: MoveConfig; filePath: string }> {
+  // Search upward for wpmove.yml, similar to how wordmove searches for Movefile
+  let currentDir = path.resolve(cwd);
+  let file: string | null = null;
+
+  while (true) {
+    const candidate = path.join(currentDir, 'wpmove.yml');
+    if (await fs.pathExists(candidate)) {
+      file = candidate;
+      break;
+    }
+
+    // Check if we've reached the root or a WordPress installation (has wp-config.php)
+    const parent = path.dirname(currentDir);
+    const hasWpConfig = await fs.pathExists(path.join(currentDir, 'wp-config.php'));
+
+    if (parent === currentDir || hasWpConfig) {
+      // Reached filesystem root or WordPress root without finding config
+      break;
+    }
+
+    currentDir = parent;
+  }
+
+  if (!file) {
+    throw new Error(`Config file not found: searched upward from ${cwd} for wpmove.yml`);
+  }
+
+  const content = await fs.readFile(file, 'utf8');
+  const data = parse(content) as unknown;
+  const parsed = ConfigSchema.safeParse(data);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join('\n');
+    throw new Error(`Invalid wpmove.yml\n${issues}`);
+  }
+  return { config: parsed.data, filePath: file };
 }
 
 export function getEnv(config: MoveConfig, name: string): Env {

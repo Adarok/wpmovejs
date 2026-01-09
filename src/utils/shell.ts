@@ -1,5 +1,6 @@
 import { execa } from 'execa';
 import chalk from 'chalk';
+import crypto from 'node:crypto';
 import { labels, logVerbose, logWarn } from '../state.js';
 
 export async function whichCmd(cmd: string): Promise<string | null> {
@@ -22,11 +23,35 @@ export async function run(
   return execa(cmd, args, { cwd: opts.cwd, env: opts.env, stdio: opts.stdio ?? 'inherit' });
 }
 
-function maskSecrets(input: string): string {
-  // Mask MySQL-style inline passwords like -ppassword, MYSQL_PWD=secret
-  let out = input.replace(/-p[^\s'";|&]+/g, '-p****');
+/**
+ * Mask sensitive information in command strings for logging.
+ * Covers various MySQL password patterns and common credential formats.
+ */
+export function maskSecrets(input: string): string {
+  let out = input;
+  // MySQL long-form password: --password=PASSWORD (must come before short-form to prevent partial match)
+  out = out.replace(/--password=[^\s'";|&]+/g, '--password=****');
+  // Quoted passwords after --password=
+  out = out.replace(/--password='[^']*'/g, "--password='****'");
+  out = out.replace(/--password="[^"]*"/g, '--password="****"');
+  // MySQL short-form password: -pPASSWORD (no space after -p)
+  // Use negative lookahead to avoid matching --port, --path, etc.
+  // Match -p followed by non-whitespace, but only when preceded by start/whitespace (not -)
+  out = out.replace(/(^|[\s])-p([^\s'";|&-][^\s'";|&]*)/g, '$1-p****');
+  // Quoted passwords after -p (single or double quotes)
+  out = out.replace(/(^|[\s])-p'[^']*'/g, "$1-p'****'");
+  out = out.replace(/(^|[\s])-p"[^"]*"/g, '$1-p"****"');
+  // Environment variable style: MYSQL_PWD=PASSWORD
   out = out.replace(/MYSQL_PWD=[^\s'";|&]+/g, 'MYSQL_PWD=****');
   return out;
+}
+
+/**
+ * Generate a cryptographically random temp filename.
+ * Uses crypto.randomUUID() for unpredictable names.
+ */
+export function generateSecureTempName(prefix = 'wpmovejs'): string {
+  return `${prefix}-${crypto.randomUUID()}.sql`;
 }
 
 export async function ssh(

@@ -1,11 +1,11 @@
 import { Command } from 'commander';
 import path from 'node:path';
 import os from 'node:os';
-import { getEnv, loadConfig, resolvePaths, handleForbiddenTargets } from '../config.js';
+import { getEnv, loadConfigWithPath, checkConfigPermissions, resolvePaths, handleForbiddenTargets } from '../config.js';
 import fs from 'fs-extra';
 import { runHook } from '../hooks.js';
 import { computeUrlPairs } from '../utils/urls.js';
-import { rsync, ssh, shQuote } from '../utils/shell.js';
+import { rsync, ssh, shQuote, generateSecureTempName } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { resolveTargets } from '../utils/targets.js';
 import { wp } from '../services/wpcli.js';
@@ -35,7 +35,10 @@ export default function push(): Command {
       if (!remoteName) {
         throw new Error('Missing --environment/-e. Example: wpmovejs push -e staging --only db,uploads');
       }
-      const cfg = await loadConfig();
+      const { config: cfg, filePath: configPath } = await loadConfigWithPath();
+      // Security: warn if config file has insecure permissions
+      const permWarning = await checkConfigPermissions(configPath);
+      if (permWarning) logWarn(permWarning);
       const local = getEnv(cfg, 'local');
       const remote = getEnv(cfg, remoteName);
       if (!remote.ssh) throw new Error(`Remote '${remoteName}' has no ssh config`);
@@ -110,11 +113,12 @@ export default function push(): Command {
           logDry('Would export DB locally, transfer to remote, import, and run search-replace');
         } else {
           logInfo('Database push: export local → import remote and search-replace');
-          const tmpLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}.sql`);
-          const transformedLocal = path.join(os.tmpdir(), `wpmovejs-${Date.now()}-sr.sql`);
-          const tmpBase = path.basename(tmpLocal);
+          const tmpName = generateSecureTempName();
+          const tmpLocal = path.join(os.tmpdir(), tmpName);
+          const transformedName = generateSecureTempName('wpmovejs-sr');
+          const transformedLocal = path.join(os.tmpdir(), transformedName);
           const remoteDir = remote.ssh.path;
-          const tmpRemote = `${remoteDir}/${tmpBase}`;
+          const tmpRemote = `${remoteDir}/${tmpName}`;
 
           try {
             if (opts.mysql || !remoteWpAvailable) {
@@ -124,14 +128,16 @@ export default function push(): Command {
               await wp(['search-replace', ...flatPairs, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root', `--export=${transformedLocal}`], { bin: local.wp_cli, cwd: local.wordpress_path });
               await rsync(transformedLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
               // Fallback: use mysql client to import
+              // SECURITY: Use MYSQL_PWD env var instead of -p flag to avoid password exposure in process list
               const db = remote.db!;
               const mysqlCreds = [
                 `-h${db.host}`,
                 `-u${db.user}`,
-                db.password ? `-p${db.password}` : '',
                 db.name,
-              ].filter(Boolean).join(' ');
-              const mysqlCmd = `mysql ${mysqlCreds} < ${shQuote(tmpRemote)}`;
+              ].join(' ');
+              // Set MYSQL_PWD in the remote shell environment (not visible in ps output)
+              const pwdPrefix = db.password ? `MYSQL_PWD=${shQuote(db.password)} ` : '';
+              const mysqlCmd = `${pwdPrefix}mysql ${mysqlCreds} < ${shQuote(tmpRemote)}`;
               await ssh(
                 remote.ssh.user,
                 remote.ssh.host,
