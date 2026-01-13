@@ -5,13 +5,12 @@ export function buildRsyncOpts(
   destEnv: Env,
   base: { ssh: Ssh; dryRun?: boolean; includes?: string[]; excludes?: string[]; delete?: boolean }
 ) {
-  const envExcludes = [
-    ...((sourceEnv.exclude ?? []) as string[]),
-    ...((destEnv.exclude ?? []) as string[]),
-  ];
+  // Rule 3: The remote environment's excludes are always used when syncing between local and remote
+  // Identify which env is the remote (has SSH config)
+  const remoteEnv = sourceEnv.ssh ? sourceEnv : destEnv;
   const finalExcludes = [
-    ...((destEnv.sync?.excludes ?? []) as string[]),
-    ...envExcludes,
+    ...((remoteEnv.sync?.excludes ?? []) as string[]),
+    ...((remoteEnv.exclude ?? []) as string[]),
     ...((base.excludes ?? []) as string[]),
   ];
   const finalIncludes = base.includes ?? destEnv.sync?.includes;

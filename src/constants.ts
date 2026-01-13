@@ -1,6 +1,13 @@
-export const DEFAULT_WORDPRESS_EXCLUDES = ['/wp-config.php', '*.sql'];
+// Default excludes used when generating wpmove.yml templates (init/sniff commands)
+// These match the template in init.ts for consistency
+export const DEFAULT_TEMPLATE_EXCLUDES = [
+  '.git/',
+  'node_modules/',
+  '*.sql',
+  'wpmove.yml',
+];
 
-// Ensures wpmove.yml is always in the exclude list
+// Ensures wpmove.yml is always in the exclude list (used by migrate command)
 export function ensureWpmoveExcluded(excludes: string[]): string[] {
   const normalized = excludes.map(e => e.trim()).filter(Boolean);
   if (!normalized.includes('wpmove.yml')) {

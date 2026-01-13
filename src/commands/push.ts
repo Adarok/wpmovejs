@@ -10,7 +10,6 @@ import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { resolveTargets } from '../utils/targets.js';
 import { wp } from '../services/wpcli.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
-import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
 import { logDry, logInfo, logOk, logWarn } from '../state.js';
 import { preflight } from '../preflight.js';
 
@@ -84,7 +83,7 @@ export default function push(): Command {
       const dstRoot = remotePath + '/';
       if (targets.includes('wordpress')) {
         const wpContentRel = resolvePaths(local).wp_content;
-        const excludes = ['/' + wpContentRel.replace(/^\/?/, '') + '/*', ...DEFAULT_WORDPRESS_EXCLUDES, ...(syncOpts.excludes ?? [])];
+        const excludes = ['/' + wpContentRel.replace(/^\/?/, '') + '/*', ...(syncOpts.excludes ?? [])];
         await rsync(srcRoot, dstRoot, { ...syncOpts, excludes });
       }
       if (targets.includes('uploads')) {

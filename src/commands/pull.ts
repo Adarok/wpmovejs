@@ -9,7 +9,6 @@ import { wp } from '../services/wpcli.js';
 import { runHook } from '../hooks.js';
 import { computeUrlPairs } from '../utils/urls.js';
 import { buildRsyncOpts } from '../utils/syncOptions.js';
-import { DEFAULT_WORDPRESS_EXCLUDES } from '../constants.js';
 import { resolveTargets } from '../utils/targets.js';
 import { logDry, logInfo, logOk, logWarn } from '../state.js';
 import { preflight } from '../preflight.js';
@@ -80,7 +79,7 @@ export default function pull(): Command {
       const srcRoot = `${remotePath}/`;
       const dstRoot = localWp.endsWith('/') ? localWp : localWp + '/';
       if (targets.includes('wordpress')) {
-        const excludes = ['/' + resolvePaths(remote).wp_content.replace(/^\/?/, '') + '/*', ...DEFAULT_WORDPRESS_EXCLUDES, ...(syncOpts.excludes ?? [])];
+        const excludes = ['/' + resolvePaths(remote).wp_content.replace(/^\/?/, '') + '/*', ...(syncOpts.excludes ?? [])];
         await rsync(srcRoot, dstRoot, { ...syncOpts, excludes, label: 'WordPress core' });
       }
       if (targets.includes('uploads')) await rsync(srcRoot, dstRoot, { ...syncOpts, includes: includePathsFor(uploadsRel), excludes: excludePathsFor(uploadsRel, syncOpts.excludes), label: 'Uploads' });
