@@ -40,7 +40,8 @@ local:
     - .git/
     - node_modules/
     - '*.sql'
-    - wpmove.yml
+    - wp-config.php
+    - wpmove*.yml
   # Rsync tuning applied when this env is the destination of pull
   sync:
     excludes:
@@ -154,7 +155,7 @@ production:
       # languages: false
 `;
 
-      await fs.writeFile(file, template, 'utf8');
+      await fs.writeFile(file, template, { encoding: 'utf8', mode: 0o600 });
       console.log(`Created ${file}`);
     });
 
