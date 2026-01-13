@@ -4,7 +4,8 @@ export const DEFAULT_TEMPLATE_EXCLUDES = [
   '.git/',
   'node_modules/',
   '*.sql',
-  'wpmove.yml',
+  'wp-config.php',
+  'wpmove*.yml',
 ];
 
 // Ensures wpmove.yml is always in the exclude list (used by migrate command)
