@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-01-13
+- **SECURITY**: Config files created with `wpmovejs init` now have restrictive permissions (0600).
+- **IMPROVEMENT**: Exclude handling is now explicit and consistent:
+  - No default excludes applied at runtime beyond what is declared in `wpmove.yml`
+  - `init` and `sniff` commands generate consistent default excludes
+  - Remote environment's excludes always apply when syncing (both push and pull)
+- **IMPROVEMENT**: Default excludes in generated configs now include:
+  - `.git/`, `node_modules/`, `*.sql`, `wp-config.php`, `wpmove*.yml`
+- **FIX**: Added `test:e2e:full` npm script for complete e2e test workflow.
+- **FIX**: Docker compose project name consistency in e2e test scripts.
+
 ## [0.7.0] - 2024-12-16
 - **IMPROVEMENT**: Rsync progress output now displayed in real-time without requiring `--verbose` flag.
   - File changes (ADD, UPD, DEL, DIR) shown as they happen during transfer
