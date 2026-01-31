@@ -74,10 +74,5 @@ jobs:
             *) echo "Package is unscoped: $PKG_NAME" ;;
           esac
 
-      - name: Publish (scoped public)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -f .npmrc ]; then rm .npmrc; fi
-          npm config set //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
-          npm publish --provenance --access public
+      - name: Publish to npm (Trusted Publisher)
+        run: npm publish --access public
