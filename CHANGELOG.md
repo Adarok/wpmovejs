@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.2] - 2026-01-31
+- **FIX**: Upgraded CI/CD workflows to Node.js 24 LTS for native npm Trusted Publisher support.
+- **CHANGE**: Minimum Node.js version bumped to 20.
+
 ## [0.8.1] - 2026-01-31
 - **FIX**: Updated GitHub Actions workflow for npm Trusted Publisher (OIDC) authentication.
 
