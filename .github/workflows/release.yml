@@ -73,4 +73,7 @@ jobs:
           esac
 
       - name: Publish to npm (Trusted Publisher)
-        run: npm publish --access public
+        run: |
+          rm -f ~/.npmrc .npmrc
+          npm config set registry https://registry.npmjs.org/
+          npm publish --access public

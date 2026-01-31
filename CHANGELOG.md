@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.4] - 2026-01-31
+- **FIX**: Configure npm registry explicitly for OIDC Trusted Publisher authentication.
+
 ## [0.8.3] - 2026-01-31
 - **FIX**: Fixed npm Trusted Publisher by removing registry-url from setup-node (avoids token-based .npmrc).
 
