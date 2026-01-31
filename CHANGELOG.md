@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-01-31
+- **FIX**: Updated GitHub Actions workflow for npm Trusted Publisher (OIDC) authentication.
+
 ## [0.8.0] - 2026-01-13
 - **SECURITY**: Config files created with `wpmovejs init` now have restrictive permissions (0600).
 - **IMPROVEMENT**: Exclude handling is now explicit and consistent:
