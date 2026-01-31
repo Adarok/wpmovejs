@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.5] - 2026-01-31
+- **FIX**: Simplified npm Trusted Publisher workflow configuration.
+
 ## [0.8.4] - 2026-01-31
 - **FIX**: Configure npm registry explicitly for OIDC Trusted Publisher authentication.
 
