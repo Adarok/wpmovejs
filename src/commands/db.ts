@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { loadConfig, getEnv } from '../config.js';
-import { run, shQuote } from '../utils/shell.js';
+import { run, shQuote, sshDest } from '../utils/shell.js';
 
 function buildDbShell(): Command {
   const cmd = new Command('shell')
@@ -24,7 +24,7 @@ function buildDbShell(): Command {
         return;
       }
 
-  const userAtHost = `${env.ssh.user}@${env.ssh.host}`;
+  const userAtHost = sshDest(env.ssh);
   const port = env.ssh.port ? Number(env.ssh.port) : undefined;
       const cdPrefix = shouldCd && env.ssh?.path ? `cd ${shQuote(env.ssh.path)} && ` : '';
       const remoteCmd = `${cdPrefix}${env.wp_cli ?? 'wp'} db cli ${extra}`.trim();

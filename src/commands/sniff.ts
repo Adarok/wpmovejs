@@ -12,7 +12,7 @@ export default function sniff(): Command {
   const cmd = new Command('sniff')
     .description('Sniff remote WordPress configuration and add it as a new environment')
     .requiredOption('-e, --environment <name>', 'name for the new environment')
-    .requiredOption('-s, --ssh <user@host>', 'SSH connection string (user@host)')
+    .requiredOption('-s, --ssh <[user@]host>', 'SSH connection string (host or user@host)')
     .requiredOption('-p, --path <path>', 'remote WordPress installation path')
     .option('--port <number>', 'SSH port (default: 22)', parseInt)
     .action(async (opts) => {
@@ -35,14 +35,28 @@ export default function sniff(): Command {
         process.exit(1);
       }
 
-      // Parse SSH string
+      // Parse SSH string: supports both "user@host" and plain "host" (SSH config alias)
+      let user: string | undefined;
+      let host: string;
       const sshMatch = sshString.match(/^([^@]+)@(.+)$/);
-      if (!sshMatch) {
-        logError(`Invalid SSH string format. Expected: user@host`);
+      if (sshMatch) {
+        user = sshMatch[1];
+        host = sshMatch[2];
+      } else {
+        host = sshString;
+      }
+
+      // Validate hostname: only ASCII letters, digits, dots, hyphens allowed
+      // Catches accented characters and other non-ASCII that cause cryptic SSH failures
+      if (!/^[a-zA-Z0-9._-]+$/.test(host)) {
+        logError(`Invalid hostname '${host}' — contains non-ASCII or special characters. Did you mean: ${chalk.cyan(host.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))}?`);
+        process.exit(1);
+      }
+      if (user && !/^[a-zA-Z0-9._-]+$/.test(user)) {
+        logError(`Invalid SSH username '${user}' — contains non-ASCII or special characters`);
         process.exit(1);
       }
 
-      const [, user, host] = sshMatch;
       const port = opts.port;
 
       logInfo(`Connecting to ${chalk.cyan(sshString)} to read wp-config.php from ${chalk.cyan(remotePath)}`);
@@ -90,7 +104,7 @@ export default function sniff(): Command {
       const newEnv: any = {
         ssh: {
           host,
-          user,
+          ...(user ? { user } : {}),
           ...(port && port !== 22 ? { port } : {}),
           path: remotePath,
         },

@@ -5,7 +5,7 @@ import { labels } from '../state.js';
 export interface WPOptions {
   bin?: string;
   cwd?: string;
-  remote?: { user: string; host: string; port?: number; path: string };
+  remote?: { user?: string; host: string; port?: number; path: string };
 }
 
 export async function wp(args: string[], options: WPOptions = {}) {

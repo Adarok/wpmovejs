@@ -5,7 +5,7 @@ import { getEnv, loadConfigWithPath, checkConfigPermissions, resolvePaths, handl
 import fs from 'fs-extra';
 import { runHook } from '../hooks.js';
 import { computeUrlPairs } from '../utils/urls.js';
-import { rsync, ssh, shQuote, generateSecureTempName } from '../utils/shell.js';
+import { rsync, ssh, shQuote, generateSecureTempName, sshDest } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { resolveTargets } from '../utils/targets.js';
 import { wp } from '../services/wpcli.js';
@@ -70,7 +70,7 @@ export default function push(): Command {
 
   const localWp = local.wordpress_path ?? '.';
   const paths = resolvePaths(local);
-      const remotePath = `${remote.ssh.user}@${remote.ssh.host}:${remote.ssh.path}`;
+      const remotePath = `${sshDest(remote.ssh)}:${remote.ssh.path}`;
   const uploadsRel = paths.uploads;
   const pluginsRel = paths.plugins;
   const muPluginsRel = paths.mu_plugins;
@@ -122,10 +122,20 @@ export default function push(): Command {
           try {
             if (opts.mysql || !remoteWpAvailable) {
               // Create transformed SQL locally without modifying DB, then import remotely via mysql
+              // Backup → apply all search-replace pairs in place → export → restore backup
               const pairs = computeUrlPairs(local, remote);
-              const flatPairs = pairs.flatMap((p) => [p.search, p.replace]);
-              await wp(['search-replace', ...flatPairs, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root', `--export=${transformedLocal}`], { bin: local.wp_cli, cwd: local.wordpress_path });
-              await rsync(transformedLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+              const backupFile = path.join(os.tmpdir(), generateSecureTempName('wpmovejs-backup'));
+              await wp(['db', 'export', backupFile], { bin: local.wp_cli, cwd: local.wordpress_path });
+              try {
+                for (const p of pairs) {
+                  await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
+                }
+                await wp(['db', 'export', transformedLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+              } finally {
+                await wp(['db', 'import', backupFile], { bin: local.wp_cli, cwd: local.wordpress_path });
+                try { await fs.promises.unlink(backupFile); } catch {}
+              }
+              await rsync(transformedLocal, `${sshDest(remote.ssh)}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
               // Fallback: use mysql client to import
               // SECURITY: Use MYSQL_PWD env var instead of -p flag to avoid password exposure in process list
               const db = remote.db!;
@@ -146,7 +156,7 @@ export default function push(): Command {
               );
             } else {
               await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
-              await rsync(tmpLocal, `${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
+              await rsync(tmpLocal, `${sshDest(remote.ssh)}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
               await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
             }
 

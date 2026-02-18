@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'node:path';
 import { Env } from './config.js';
-import { run, shQuote, whichCmd } from './utils/shell.js';
+import { run, shQuote, sshDest, whichCmd } from './utils/shell.js';
 import { Target } from './utils/targets.js';
 import { labels, logInfo, logWarn } from './state.js';
 
@@ -40,10 +40,10 @@ export async function preflight(
   try {
     const args = ['-o', 'BatchMode=yes'] as string[];
     if (ssh.port) args.push('-p', String(ssh.port));
-    args.push(`${ssh.user}@${ssh.host}`, 'true');
+    args.push(sshDest(ssh), 'true');
     await run('ssh', args, { stdio: 'pipe' });
   } catch (_e) {
-    throw new Error(`SSH connectivity failed to ${ssh.user}@${ssh.host}${ssh.port ? `:${ssh.port}` : ''}`);
+    throw new Error(`SSH connectivity failed to ${sshDest(ssh)}${ssh.port ? `:${ssh.port}` : ''}`);
   }
 
   // Remote path checks
@@ -54,7 +54,7 @@ export async function preflight(
   try {
     const args = [] as string[];
     if (ssh.port) args.push('-p', String(ssh.port));
-    args.push(`${ssh.user}@${ssh.host}`, remotePathCmd);
+    args.push(sshDest(ssh), remotePathCmd);
     await run('ssh', args, { stdio: 'pipe' });
   } catch {
     if (opts.operation === 'push' && hasFileTargets(opts.targets)) {
@@ -76,7 +76,7 @@ export async function preflight(
     try {
       const args = [] as string[];
       if (ssh.port) args.push('-p', String(ssh.port));
-      args.push(`${ssh.user}@${ssh.host}`, remoteWpCheck);
+      args.push(sshDest(ssh), remoteWpCheck);
       await run('ssh', args, { stdio: 'pipe' });
     } catch {
       remoteWpAvailable = false;
@@ -93,7 +93,7 @@ export async function preflight(
       try {
         const args = [] as string[];
         if (ssh.port) args.push('-p', String(ssh.port));
-        args.push(`${ssh.user}@${ssh.host}`, checkMysql);
+        args.push(sshDest(ssh), checkMysql);
         await run('ssh', args, { stdio: 'pipe' });
       } catch {
         throw new Error('Remote mysql client not found in PATH');
@@ -101,7 +101,7 @@ export async function preflight(
       try {
         const args = [] as string[];
         if (ssh.port) args.push('-p', String(ssh.port));
-        args.push(`${ssh.user}@${ssh.host}`, checkDump);
+        args.push(sshDest(ssh), checkDump);
         await run('ssh', args, { stdio: 'pipe' });
       } catch {
         throw new Error('Remote mysqldump not found in PATH');

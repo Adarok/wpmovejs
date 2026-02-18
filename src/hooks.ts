@@ -11,7 +11,7 @@ export interface HooksConfig {
   pull?: { before?: HookDef; after?: HookDef };
 }
 
-export async function runHook(def: HookDef | undefined, remote?: { user: string; host: string; port?: number; path: string }) {
+export async function runHook(def: HookDef | undefined, remote?: { user?: string; host: string; port?: number; path: string }) {
   if (!def) return;
   for (const cmd of def.local ?? []) {
     logVerbose('hook local:', cmd);

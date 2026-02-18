@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'fs-extra';
 import { getEnv, loadConfigWithPath, checkConfigPermissions, resolvePaths, handleForbiddenTargets } from '../config.js';
-import { rsync, ssh, shQuote, generateSecureTempName } from '../utils/shell.js';
+import { rsync, ssh, shQuote, generateSecureTempName, sshDest } from '../utils/shell.js';
 import { includePathsFor, excludePathsFor } from '../utils/rsyncFilters.js';
 import { wp } from '../services/wpcli.js';
 import { runHook } from '../hooks.js';
@@ -68,7 +68,7 @@ export default function pull(): Command {
 
   const localWp = local.wordpress_path ?? '.';
   const paths = resolvePaths(local);
-      const remotePath = `${remote.ssh.user}@${remote.ssh.host}:${remote.ssh.path}`;
+      const remotePath = `${sshDest(remote.ssh)}:${remote.ssh.path}`;
   const uploadsRel = paths.uploads;
   const pluginsRel = paths.plugins;
   const muPluginsRel = paths.mu_plugins;
@@ -148,7 +148,7 @@ export default function pull(): Command {
           } else {
             await wp(['db', 'export', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
           }
-          await rsync(`${remote.ssh.user}@${remote.ssh.host}:${tmpRemote}`, tmpLocal, { ssh: remote.ssh, dryRun: false });
+          await rsync(`${sshDest(remote.ssh)}:${tmpRemote}`, tmpLocal, { ssh: remote.ssh, dryRun: false });
           await wp(['db', 'import', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
           // Always run local search-replace after import (both fallback and normal paths)
           const pairs = computeUrlPairs(remote, local);

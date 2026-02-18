@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { loadConfig, getEnv } from '../config.js';
-import { run, shQuote } from '../utils/shell.js';
+import { run, shQuote, sshDest } from '../utils/shell.js';
 
 export default function sshCmd(): Command {
   const cmd = new Command('ssh')
@@ -15,7 +15,7 @@ export default function sshCmd(): Command {
       const remote = getEnv(cfg, envName);
       if (!remote.ssh) throw new Error(`Environment '${envName}' has no ssh config`);
 
-  const userAtHost = `${remote.ssh.user}@${remote.ssh.host}`;
+  const userAtHost = sshDest(remote.ssh);
   const port = remote.ssh.port ? Number(remote.ssh.port) : undefined;
       const hasCmd = Array.isArray(cmdParts) && cmdParts.length > 0;
       const shouldCd = opts.cd !== false && Boolean(remote.ssh.path);

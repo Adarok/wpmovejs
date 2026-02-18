@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.6] - 2026-02-13
+- **FIX**: Database push with mysql fallback failed when multiple search-replace pairs existed (URL + path). Each pair is now applied individually instead of flattening into a single wp search-replace call.
+
 ## [0.8.5] - 2026-01-31
 - **FIX**: Simplified npm Trusted Publisher workflow configuration.
 

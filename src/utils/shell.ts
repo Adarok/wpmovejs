@@ -54,19 +54,28 @@ export function generateSecureTempName(prefix = 'wpmovejs'): string {
   return `${prefix}-${crypto.randomUUID()}.sql`;
 }
 
+/**
+ * Build an SSH destination string: "user@host" when user is present, otherwise just "host".
+ * Use for ssh and rsync targets where the connection may rely on SSH config.
+ */
+export function sshDest(ssh: { user?: string; host: string }): string {
+  return ssh.user ? `${ssh.user}@${ssh.host}` : ssh.host;
+}
+
 export async function ssh(
-  user: string,
+  user: string | undefined,
   host: string,
   command: string,
   port?: number,
   opts: { stdio?: 'inherit' | 'pipe' } = {}
 ) {
   const shown = maskSecrets(command);
-  const target = port ? `${user}@${host}:${port}` : `${user}@${host}`;
+  const dest = user ? `${user}@${host}` : host;
+  const target = port ? `${dest}:${port}` : dest;
   console.log(labels.remote, chalk.white('ssh'), chalk.gray(target), chalk.gray(shown));
   const args = [] as string[];
   if (port) args.push('-p', String(port));
-  args.push(`${user}@${host}`, command);
+  args.push(dest, command);
   return run('ssh', args, { stdio: opts.stdio });
 }
 
@@ -78,7 +87,7 @@ export async function rsync(
     dryRun?: boolean;
     excludes?: string[];
     includes?: string[];
-    ssh?: { user: string; host: string; port?: number };
+    ssh?: { user?: string; host: string; port?: number };
     label?: string;
   } = {}
 ) {

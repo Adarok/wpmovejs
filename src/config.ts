@@ -15,7 +15,7 @@ const DbSchema = z.object({
 
 const SshSchema = z.object({
   host: z.string(),
-  user: z.string(),
+  user: z.string().optional(),
   port: z.number().int().positive().default(22).optional(),
   path: z.string().refine((p: string) => p.startsWith('/'), {
     message: 'ssh.path must be an absolute path starting with /',
@@ -109,7 +109,7 @@ export interface Db {
 
 export interface Ssh {
   host: string;
-  user: string;
+  user?: string;
   port?: number;
   path: string;
 }
