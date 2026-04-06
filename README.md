@@ -169,6 +169,66 @@ When a forbidden operation is attempted, wpmovejs will display a warning and ski
 [warn] Push of 'db' is forbidden by production environment configuration
 ```
 
+## Hooks
+
+Hooks let you run shell commands before and after `push` or `pull` operations. Commands can run locally or on the remote server.
+
+```yaml
+local:
+  hooks:
+    push:
+      before:
+        local:
+          - echo "Starting push from local"
+          - wp db export backup.sql
+      after:
+        local:
+          - rm backup.sql
+    pull:
+      before:
+        local:
+          - wp db export pre-pull-backup.sql
+      after:
+        local:
+          - wp cache flush
+
+production:
+  hooks:
+    push:
+      after:
+        remote:
+          - wp cache flush
+          - wp rewrite flush
+    pull:
+      before:
+        remote:
+          - wp db export /tmp/backup-before-pull.sql
+```
+
+**Hook execution order:**
+
+1. `local.hooks.<op>.before` — local commands
+2. `remote.hooks.<op>.before` — remote commands (via SSH)
+3. *file/database sync happens*
+4. `local.hooks.<op>.after` — local commands
+5. `remote.hooks.<op>.after` — remote commands (via SSH)
+
+**Key behaviors:**
+
+- Remote commands automatically `cd` to `ssh.path` before executing
+- Commands run via `sh -lc` (login shell) for proper environment/PATH
+- Hooks are **skipped entirely** during `--dry-run`
+- Use `-v/--verbose` to see hook commands as they execute
+
+**Common use cases:**
+
+- Backup database before sync: `wp db export backup.sql`
+- Flush caches after sync: `wp cache flush`
+- Clear object cache: `wp cache flush`
+- Rebuild permalinks: `wp rewrite flush`
+- Run deployment scripts: `./deploy.sh`
+- Notify services: `curl -X POST https://hooks.slack.com/...`
+
 ## File Sync Behavior
 
 - Root-based rsync from WordPress root with include/exclude filters.
