@@ -28,6 +28,7 @@ export default function push(): Command {
   .option('--all', 'include all: wordpress,uploads,themes,plugins,mu-plugins,languages,db')
   .option('--only <targets>', 'comma-separated alternatives to flags: db,uploads,plugins,themes,mu-plugins,languages,wordpress')
   .option('--items <names>', 'comma-separated list of specific plugin or theme names to sync (use with -p/-t)')
+    .option('--backup [path]', 'backup remote database to local file before pushing (default: backup-<env>-<timestamp>.sql in CWD)')
     .option('--dry-run', 'show what would be done', false)
     .action(async (opts) => {
       const remoteName = opts.environment;
@@ -55,6 +56,11 @@ export default function push(): Command {
       const specificItems = opts.items ? opts.items.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined;
       if (specificItems && specificItems.length > 0 && !targets.includes('plugins') && !targets.includes('themes')) {
         throw new Error('--items requires -p/--plugins or -t/--themes flag');
+      }
+
+      // Validate --backup requires db target
+      if (opts.backup && !targets.includes('db')) {
+        throw new Error('--backup requires the database target (-d/--db)');
       }
 
       let remoteWpAvailable = true;
@@ -108,9 +114,68 @@ export default function push(): Command {
 
       // Run DB last to ensure files/plugins are present for wp-cli operations
       if (targets.includes('db')) {
+        // Resolve backup path if --backup is set
+        let backupDest: string | undefined;
+        if (opts.backup) {
+          if (typeof opts.backup === 'string') {
+            backupDest = path.resolve(opts.backup);
+          } else {
+            const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            backupDest = path.resolve(`backup-${remoteName}-${ts}.sql`);
+          }
+        }
+
         if (isDry) {
+          if (backupDest) logDry(`Would back up remote database to ${backupDest}`);
           logDry('Would export DB locally, transfer to remote, import, and run search-replace');
         } else {
+          // Backup remote DB before push if requested
+          if (backupDest) {
+            logInfo(`Backing up remote database to ${backupDest}`);
+            const remoteDir = remote.ssh.path;
+            const bkTmpName = generateSecureTempName('wpmovejs-bk');
+            const bkTmpRemote = `${remoteDir}/${bkTmpName}`;
+            try {
+              if (opts.mysql || !remoteWpAvailable) {
+                const db = remote.db!;
+                const creds = [
+                  `-h${db.host}`,
+                  `-u${db.user}`,
+                  db.name,
+                ].join(' ');
+                const pwdPrefix = db.password ? `MYSQL_PWD=${shQuote(db.password)} ` : '';
+                try {
+                  await ssh(
+                    remote.ssh.user,
+                    remote.ssh.host,
+                    `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(bkTmpRemote)}`)}`,
+                    remote.ssh.port,
+                    { stdio: 'pipe' }
+                  );
+                } catch (err: any) {
+                  if (err?.message?.includes('unknown variable') || err?.message?.includes('set-gtid-purged')) {
+                    logWarn('mysqldump --set-gtid-purged not supported, retrying without it');
+                    await ssh(
+                      remote.ssh.user,
+                      remote.ssh.host,
+                      `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction > ${shQuote(bkTmpRemote)}`)}`,
+                      remote.ssh.port,
+                      { stdio: 'pipe' }
+                    );
+                  } else {
+                    throw err;
+                  }
+                }
+              } else {
+                await wp(['db', 'export', bkTmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
+              }
+              await rsync(`${sshDest(remote.ssh)}:${bkTmpRemote}`, backupDest, { ssh: remote.ssh, dryRun: false });
+              logOk(`Remote database backed up to ${backupDest}`);
+            } finally {
+              try { await ssh(remote.ssh.user, remote.ssh.host, `rm -f ${shQuote(bkTmpRemote)}`, remote.ssh.port); } catch {}
+            }
+          }
+
           logInfo('Database push: export local → import remote and search-replace');
           const tmpName = generateSecureTempName();
           const tmpLocal = path.join(os.tmpdir(), tmpName);
@@ -125,14 +190,14 @@ export default function push(): Command {
               // Backup → apply all search-replace pairs in place → export → restore backup
               const pairs = computeUrlPairs(local, remote);
               const backupFile = path.join(os.tmpdir(), generateSecureTempName('wpmovejs-backup'));
-              await wp(['db', 'export', backupFile], { bin: local.wp_cli, cwd: local.wordpress_path });
+              await wp(['db', 'export', backupFile, '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
               try {
                 for (const p of pairs) {
                   await wp(['search-replace', p.search, p.replace, '--quiet', '--skip-columns=guid', '--all-tables', '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
                 }
-                await wp(['db', 'export', transformedLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+                await wp(['db', 'export', transformedLocal, '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
               } finally {
-                await wp(['db', 'import', backupFile], { bin: local.wp_cli, cwd: local.wordpress_path });
+                await wp(['db', 'import', backupFile, '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
                 try { await fs.promises.unlink(backupFile); } catch {}
               }
               await rsync(transformedLocal, `${sshDest(remote.ssh)}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
@@ -155,7 +220,7 @@ export default function push(): Command {
                 { stdio: 'pipe' }
               );
             } else {
-              await wp(['db', 'export', tmpLocal], { bin: local.wp_cli, cwd: local.wordpress_path });
+              await wp(['db', 'export', tmpLocal, '--allow-root'], { bin: local.wp_cli, cwd: local.wordpress_path });
               await rsync(tmpLocal, `${sshDest(remote.ssh)}:${tmpRemote}`, { ssh: remote.ssh, dryRun: false });
               await wp(['db', 'import', tmpRemote], { remote: { ...remote.ssh, path: remoteDir }, bin: remote.wp_cli });
             }

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-04-10
+- **NEW FEATURE**: Added `--backup` option to `push` command for database operations.
+  - Backs up remote database to local file before pushing
+  - Auto-generates filename `backup-<env>-<timestamp>.sql` or use custom path
+  - Supports both wp-cli and mysql/mysqldump backends
+  - Includes fallback for mysqldump servers without `--set-gtid-purged` support
+- **FIX**: Added missing `--allow-root` flags to wp-cli export/import commands during database push with mysql fallback.
+
 ## [0.8.6] - 2026-02-13
 - **FIX**: Database push with mysql fallback failed when multiple search-replace pairs existed (URL + path). Each pair is now applied individually instead of flattening into a single wp search-replace call.
 

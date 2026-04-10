@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   runWpmovejs,
+  execInLocal,
   createTestPlugin,
   pluginExists,
   deletePlugin,
@@ -14,6 +15,7 @@ import {
   createUploadFile,
   uploadFileExists,
   deleteUploadFile,
+  setOption,
 } from '../helpers/setup.js';
 
 describe('Push Operations', () => {
@@ -130,5 +132,56 @@ describe('Push Operations', () => {
       // Cleanup
       await deletePlugin('local', testPluginName);
     }, 60000);
+  });
+
+  describe('push database with --backup', () => {
+    const markerOption = 'e2e_backup_test_marker';
+    const markerValue = 'backup-test-value-' + Date.now();
+    const backupPath = '/tmp/e2e-push-backup.sql';
+
+    it('should backup remote database to local file before pushing', async () => {
+      // Set a unique marker on the remote DB so we can verify the backup contains it
+      await setOption('remote', markerOption, markerValue);
+
+      // Run push with --backup pointing to a known path
+      const result = await runWpmovejs(['push', '-e', 'remote', '-d', '--backup', backupPath]);
+
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+      expect(result.exitCode).toBe(0);
+
+      // Verify the backup file exists in the local container and contains the marker
+      const { stdout: grepOut } = await execInLocal(`grep -c '${markerValue}' ${backupPath} || true`);
+      expect(Number(grepOut.trim())).toBeGreaterThan(0);
+
+      // Cleanup
+      await execInLocal(`rm -f ${backupPath}`);
+    }, 120000);
+
+    it('should auto-generate backup filename when no path given', async () => {
+      await setOption('remote', markerOption, markerValue);
+
+      const result = await runWpmovejs(['push', '-e', 'remote', '-d', '--backup']);
+
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+      expect(result.exitCode).toBe(0);
+
+      // Find the auto-generated backup file (backup-remote-*.sql)
+      const { stdout: files } = await execInLocal('ls backup-remote-*.sql 2>/dev/null || true');
+      expect(files.trim()).not.toBe('');
+
+      // Verify backup contains the marker
+      const backupFile = files.trim().split('\n')[0];
+      const { stdout: grepOut } = await execInLocal(`grep -c '${markerValue}' ${backupFile} || true`);
+      expect(Number(grepOut.trim())).toBeGreaterThan(0);
+
+      // Cleanup
+      await execInLocal(`rm -f ${backupFile}`);
+    }, 120000);
   });
 });
