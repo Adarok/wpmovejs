@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1] - 2026-08-16
+- **FIX**: More reliable remote wp-cli / mysql detection.
+- **FIX**: Remote database commands no longer wrapped in `sh -lc`.
+
 ## [0.9.0] - 2026-04-10
 - **NEW FEATURE**: Added `--backup` option to `push` command for database operations.
   - Backs up remote database to local file before pushing
