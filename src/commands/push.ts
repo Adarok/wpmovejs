@@ -148,7 +148,7 @@ export default function push(): Command {
                   await ssh(
                     remote.ssh.user,
                     remote.ssh.host,
-                    `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(bkTmpRemote)}`)}`,
+                    `cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction --set-gtid-purged=OFF > ${shQuote(bkTmpRemote)}`,
                     remote.ssh.port,
                     { stdio: 'pipe' }
                   );
@@ -158,7 +158,7 @@ export default function push(): Command {
                     await ssh(
                       remote.ssh.user,
                       remote.ssh.host,
-                      `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction > ${shQuote(bkTmpRemote)}`)}`,
+                      `cd ${shQuote(remoteDir)} && ${pwdPrefix}mysqldump ${creds} --single-transaction > ${shQuote(bkTmpRemote)}`,
                       remote.ssh.port,
                       { stdio: 'pipe' }
                     );
@@ -215,7 +215,7 @@ export default function push(): Command {
               await ssh(
                 remote.ssh.user,
                 remote.ssh.host,
-                `sh -lc ${shQuote(`cd ${shQuote(remoteDir)} && ${mysqlCmd}`)}`,
+                `cd ${shQuote(remoteDir)} && ${mysqlCmd}`,
                 remote.ssh.port,
                 { stdio: 'pipe' }
               );
