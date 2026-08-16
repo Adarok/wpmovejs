@@ -9,6 +9,34 @@ function hasFileTargets(targets: Target[]): boolean {
   return targets.some((t) => t !== 'db');
 }
 
+type SshConfig = { user?: string; host: string; port?: number; path: string };
+
+async function sshExec(ssh: SshConfig, command: string): Promise<void> {
+  const args: string[] = [];
+  if (ssh.port) args.push('-p', String(ssh.port));
+  args.push(sshDest(ssh), command);
+  await run('ssh', args, { stdio: 'pipe' });
+}
+
+async function remoteHasCommand(ssh: SshConfig, bin: string): Promise<boolean> {
+  // `wp_cli` may be a full command line (e.g. "php /usr/local/bin/wp"); probe the binary only.
+  const binary = bin.trim().split(/\s+/)[0];
+  const probe = `command -v ${shQuote(binary)} >/dev/null 2>&1`;
+  // The plain probe runs in ssh's default shell, which sees the same PATH the real
+  // commands get. `sh -lc` is only a fallback: it reads /etc/profile and ~/.profile
+  // but not ~/.bashrc, so it can miss binaries an interactive ssh session finds.
+  const probes = [probe, `sh -lc ${shQuote(probe)}`, `${shQuote(binary)} --version >/dev/null 2>&1`];
+  for (const cmd of probes) {
+    try {
+      await sshExec(ssh, cmd);
+      return true;
+    } catch {
+      // try next probe
+    }
+  }
+  return false;
+}
+
 export async function preflight(
   local: Env,
   remote: Env,
@@ -72,15 +100,10 @@ export async function preflight(
     if (!wpPath) throw new Error(`Local wp-cli not found: ${wpBin}`);
 
     // Remote wp presence
-    const remoteWpCheck = `sh -lc ${shQuote('command -v wp >/dev/null 2>&1')}`;
-    try {
-      const args = [] as string[];
-      if (ssh.port) args.push('-p', String(ssh.port));
-      args.push(sshDest(ssh), remoteWpCheck);
-      await run('ssh', args, { stdio: 'pipe' });
-    } catch {
-      remoteWpAvailable = false;
-      logWarn('Remote wp-cli not found; will fall back to mysql/mysqldump if needed');
+    const remoteWpBin = remote.wp_cli ?? 'wp';
+    remoteWpAvailable = await remoteHasCommand(ssh, remoteWpBin);
+    if (!remoteWpAvailable) {
+      logWarn(`Remote wp-cli not found (${remoteWpBin}); will fall back to mysql/mysqldump if needed`);
     }
 
     // If remote wp-cli is not available or forced mysql, verify mysql tools exist remotely
@@ -88,22 +111,10 @@ export async function preflight(
       if (!remote.db || !remote.db.name || !remote.db.user || !remote.db.host) {
         throw new Error('Remote db credentials (host,name,user) are required for mysql/mysqldump fallback');
       }
-      const checkMysql = `sh -lc ${shQuote('command -v mysql >/dev/null 2>&1')}`;
-      const checkDump = `sh -lc ${shQuote('command -v mysqldump >/dev/null 2>&1')}`;
-      try {
-        const args = [] as string[];
-        if (ssh.port) args.push('-p', String(ssh.port));
-        args.push(sshDest(ssh), checkMysql);
-        await run('ssh', args, { stdio: 'pipe' });
-      } catch {
+      if (!(await remoteHasCommand(ssh, 'mysql'))) {
         throw new Error('Remote mysql client not found in PATH');
       }
-      try {
-        const args = [] as string[];
-        if (ssh.port) args.push('-p', String(ssh.port));
-        args.push(sshDest(ssh), checkDump);
-        await run('ssh', args, { stdio: 'pipe' });
-      } catch {
+      if (!(await remoteHasCommand(ssh, 'mysqldump'))) {
         throw new Error('Remote mysqldump not found in PATH');
       }
     }
